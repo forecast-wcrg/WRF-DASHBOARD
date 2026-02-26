@@ -1213,7 +1213,7 @@
 
         // ==================== CONFIGURATION ====================
         const CONFIG = {
-            forecastStart: new Date("2026-02-25T05:30:00+05:30"),
+            forecastStart: new Date("2026-02-24T05:30:00+05:30"),
             baseFrameTime: 1000,
             debugMode: true,
             wrfBounds: [[28.2639, 76.6887], [31.6276, 81.1533]],
@@ -1631,6 +1631,18 @@
                 elements.currentConditions.style.display = 'none';
                 elements.locationBadge.style.display = 'flex';
                 elements.badgeLocation.textContent = name + ' (outside domain)';
+                
+                // Notify parent about location change
+                if (window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'LOCATION_UPDATE',
+                        lat: lat,
+                        lon: lon,
+                        name: name,
+                        fromDashboard: true,
+                        timestamp: Date.now()
+                    }, '*');
+                }
                 return;
             }
             
@@ -1644,6 +1656,18 @@
             elements.badgeLocation.textContent = name;
             updateCurrentConditions(lat, lon);
             loadHourlyForecast(lat, lon);
+            
+            // Notify parent about location change
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'LOCATION_UPDATE',
+                    lat: lat,
+                    lon: lon,
+                    name: name,
+                    fromDashboard: true,
+                    timestamp: Date.now()
+                }, '*');
+            }
         }
 
         async function getUserLocation() {
@@ -2358,6 +2382,125 @@
 
         document.addEventListener('DOMContentLoaded', initializeDashboard);
         window.WRFDashboard = { config: CONFIG, state, elements };
+    </script>
+    
+    <!-- ==================== PARENT PAGE COMMUNICATION (FOR EMBEDDED VERSION) ==================== -->
+    <script>
+    // Listen for location messages from parent page
+    window.addEventListener('message', function(event) {
+        // Log all messages for debugging
+        console.log('📍 Message received from parent:', event.data);
+        
+        // Handle location updates
+        if (event.data && (event.data.type === 'LOCATION_UPDATE' || event.data.type === 'location')) {
+            console.log('📍 Processing location update:', event.data);
+            
+            const lat = event.data.lat;
+            const lon = event.data.lon;
+            
+            if (lat && lon) {
+                // Update the dashboard with this location
+                const locationName = event.data.name || (event.data.isDefault ? 'Default Location' : 'Your Location');
+                
+                // Use the existing goToLocation function
+                if (typeof goToLocation === 'function') {
+                    goToLocation(lat, lon, locationName, false);
+                } else {
+                    // Fallback if function not available yet
+                    setTimeout(() => {
+                        if (typeof goToLocation === 'function') {
+                            goToLocation(lat, lon, locationName, false);
+                        }
+                    }, 2000);
+                }
+                
+                // Send confirmation back to parent
+                if (event.source) {
+                    event.source.postMessage({
+                        type: 'LOCATION_RECEIVED',
+                        lat: lat,
+                        lon: lon,
+                        status: 'success',
+                        timestamp: Date.now()
+                    }, event.origin);
+                }
+            }
+        }
+        
+        // Handle device info
+        if (event.data && event.data.type === 'DEVICE_INFO') {
+            console.log('📱 Device info received:', event.data);
+            // You can adjust UI based on device type if needed
+            if (event.data.isMobile) {
+                document.body.classList.add('mobile-device');
+            }
+        }
+        
+        // Handle handshake
+        if (event.data && event.data.type === 'HANDSHAKE') {
+            console.log('🤝 Handshake received from parent');
+            // Respond to handshake
+            if (event.source) {
+                event.source.postMessage({
+                    type: 'HANDSHAKE_RESPONSE',
+                    status: 'ready',
+                    timestamp: Date.now()
+                }, event.origin);
+            }
+        }
+        
+        // Handle location request
+        if (event.data && event.data.type === 'REQUEST_LOCATION') {
+            console.log('📍 Parent requested location');
+            // If we already have a location, send it
+            if (state && state.currentLocation) {
+                if (event.source) {
+                    event.source.postMessage({
+                        type: 'LOCATION_UPDATE',
+                        lat: state.currentLocation.lat,
+                        lon: state.currentLocation.lon,
+                        name: state.locationName || 'Current Location',
+                        timestamp: Date.now()
+                    }, event.origin);
+                }
+            } else {
+                // Send default location
+                if (event.source) {
+                    event.source.postMessage({
+                        type: 'LOCATION_UPDATE',
+                        lat: CONFIG.defaultLocation.lat,
+                        lon: CONFIG.defaultLocation.lon,
+                        name: CONFIG.defaultLocation.name,
+                        isDefault: true,
+                        timestamp: Date.now()
+                    }, event.origin);
+                }
+            }
+        }
+    });
+
+    // Initialize communication with parent
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if we're in an iframe
+        if (window.parent !== window) {
+            console.log('📍 Running in iframe, establishing communication with parent');
+            
+            // Send ready signal to parent after a short delay
+            setTimeout(() => {
+                window.parent.postMessage({
+                    type: 'DASHBOARD_READY',
+                    message: 'WRF Dashboard loaded and ready',
+                    timestamp: Date.now()
+                }, '*');
+                
+                // Request location from parent
+                window.parent.postMessage({
+                    type: 'REQUEST_LOCATION',
+                    timestamp: Date.now()
+                }, '*');
+            }, 2000);
+        }
+    });
     </script>
 </body>
 </html>
