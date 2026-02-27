@@ -1251,7 +1251,9 @@
             locationName: null,
             searchTimeout: null,
             hourlyForecastData: {},
-            defaultLocationPreloaded: false
+            defaultLocationPreloaded: false,
+            realTimeUpdateTimer: null,  // NEW: Timer for real-time updates
+            lastRealTimeCheck: 0        // NEW: Last check time
         };
 
         // ==================== UI ELEMENTS ====================
@@ -1577,6 +1579,42 @@
             if (state.currentLocation) updateCurrentConditions(state.currentLocation.lat, state.currentLocation.lon);
         }
 
+        // ==================== REAL-TIME UPDATE FUNCTION (NEW) ====================
+        function checkAndUpdateRealTime() {
+            const now = new Date();
+            const forecastStart = CONFIG.forecastStart;
+            const hoursSinceStart = Math.floor((now - forecastStart) / (3600 * 1000));
+            
+            // Only update if we're not in animation mode and the hour has changed
+            if (!state.isPlaying && hoursSinceStart !== state.lastRealTimeCheck) {
+                const targetFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
+                
+                // Update to current forecast hour if it's different from displayed
+                if (targetFH !== state.currentFH) {
+                    debug(`Real-time update: Moving from FH ${state.currentFH} to FH ${targetFH}`);
+                    showFrame(targetFH);
+                }
+                
+                // Update current conditions time and data regardless
+                if (state.currentLocation) {
+                    updateCurrentConditions(state.currentLocation.lat, state.currentLocation.lon);
+                }
+                
+                state.lastRealTimeCheck = hoursSinceStart;
+            }
+        }
+
+        // Start real-time monitoring
+        function startRealTimeMonitoring() {
+            // Check every 30 seconds
+            state.realTimeUpdateTimer = setInterval(() => {
+                checkAndUpdateRealTime();
+            }, 30000); // 30 seconds
+            
+            // Initial check
+            checkAndUpdateRealTime();
+        }
+
         function toggleAnimation() {
             state.isPlaying ? stopAnimation() : startAnimation();
         }
@@ -1587,6 +1625,9 @@
             clearInterval(state.timer);
             state.timer = null;
             elements.playBtn.innerHTML = '<i class="fas fa-play"></i> Play';
+            
+            // After stopping animation, check if we need to update to current time
+            setTimeout(() => checkAndUpdateRealTime(), 100);
         }
 
         function startAnimation() {
@@ -1772,16 +1813,23 @@
             
             elements.currentConditions.style.display = 'block';
             elements.currentLocation.textContent = state.locationName || 'Selected Location';
-            const gridIndex = latLonToGridIndex(lat, lon);
-            if (!gridIndex) return;
-
-            // Update time every time conditions are updated
+            
+            // Get current forecast hour based on current time
             const now = new Date();
-            elements.conditionsTime.textContent = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
-
             const forecastStart = CONFIG.forecastStart;
             const hoursSinceStart = Math.floor((now - forecastStart) / (3600 * 1000));
             const currentFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
+            
+            // Update time display with current IST time
+            elements.conditionsTime.textContent = now.toLocaleTimeString('en-IN', { 
+                timeZone: 'Asia/Kolkata', 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            }) + ' IST';
+            
+            const gridIndex = latLonToGridIndex(lat, lon);
+            if (!gridIndex) return;
             
             const variables = ['T2', 'RH', 'WIND', 'RAIN'];
             for (const varName of variables) {
@@ -2327,25 +2375,30 @@
                 setupEventListeners();
                 updatePlayButton();
         
-        // Calculate current forecast hour based on current time
+                // Calculate current forecast hour based on current time
                 const now = new Date();
                 const forecastStart = CONFIG.forecastStart;
                 const hoursSinceStart = Math.floor((now - forecastStart) / (3600 * 1000));
                 const currentFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
+                state.lastRealTimeCheck = hoursSinceStart;
         
                 debug(`Current time: ${now.toISOString()}`);
                 debug(`Forecast start: ${forecastStart.toISOString()}`);
                 debug(`Hours since start: ${hoursSinceStart}`);
                 debug(`Loading spatial plot for current forecast hour: ${currentFH}`);
         
-        // Show the spatial plot for the current time
+                // Show the spatial plot for the current time
                 await showFrame(currentFH);
         
                 updateStatus('Click on map to view timeseries', 'success');
                 setTimeout(() => autoDetectLocation(), 1000);
-        // Preload all timeseries for default location immediately
+                // Preload all timeseries for default location immediately
                 setTimeout(() => preloadAllTimeseriesData(), 500);
                 updateCurrentDateTime();
+                
+                // Start real-time monitoring for frame updates
+                startRealTimeMonitoring();
+                
             } catch (error) {
                 console.error('Initialization error:', error);
                 updateStatus(`Error: ${error.message}`, 'error');
