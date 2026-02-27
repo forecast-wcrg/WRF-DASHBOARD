@@ -1042,7 +1042,7 @@
             <div class="header-info">
                 <div class="info-item"><i class="far fa-calendar-alt"></i><span class="info-label">Forecast Start Time:</span><span id="fcStart">Loading...</span></div>
                 <div class="info-item"><i class="far fa-clock"></i><span class="info-label">Forecast Current Time:</span><span id="fcValid">Loading...</span></div>
-                <div class="info-item"><i class="fas fa-hourglass-half"></i><span>FH: <span id="currentFH">0</span>/<span id="totalFH">311</span></span></div>
+                <div class="info-item"><i class="fas fa-hourglass-half"></i><span>FH: <span id="currentFH">0</span>/<span id="totalFH">359</span></span></div>
                 <div class="info-item"><i class="fas fa-globe-asia"></i><span>IST</span></div>
             </div>
             <button id="themeToggle" class="theme-toggle" title="Toggle Light/Dark Mode"><i class="fas fa-moon"></i></button>
@@ -1131,7 +1131,7 @@
                         </div>
                         <div class="colorbar-controls">
                             <button id="prevBtn" class="nav-btn" title="Previous hour"><i class="fas fa-chevron-left"></i></button>
-                            <input type="range" id="timeSlider" min="0" max="311" step="1" value="0">
+                            <input type="range" id="timeSlider" min="0" max="359" step="1" value="0">
                             <button id="nextBtn" class="nav-btn" title="Next hour"><i class="fas fa-chevron-right"></i></button>
                             <button id="playBtn" class="play-btn"><i class="fas fa-play"></i> Play</button>
                         </div>
@@ -1234,7 +1234,7 @@
             currentFH: 0,
             allGrids: {},
             allTimeseriesData: {},
-            totalForecastHours: 311,
+            totalForecastHours: 359,
             isPlaying: false,
             timer: null,
             currentSpeed: 1.0,
@@ -1607,10 +1607,10 @@
                     return state.totalForecastHours;
                 }
             } catch (e) { /* ignore */ }
-            state.totalForecastHours = 311;
-            elements.slider.max = 311;
-            elements.totalFH.textContent = '311';
-            return 311;
+            state.totalForecastHours = 359;
+            elements.slider.max = 359;
+            elements.totalFH.textContent = '359';
+            return 359;
         }
 
         // ==================== LOCATION & SEARCH (FIXED - SHOWS ALL LOCATIONS WITH DOMAIN CHECK) ====================
