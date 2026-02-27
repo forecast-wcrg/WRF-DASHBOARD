@@ -1418,17 +1418,31 @@
 
         // ==================== MAP RESET FUNCTION ====================
         function resetMapView() {
-            // Reset to original view: center [29.5, 79.5] with zoom level 7
-            state.map.setView([29.5, 79.5], 7);
+            // First, check if we need to reset to current forecast hour
+            const now = new Date();
+            const forecastStart = CONFIG.forecastStart;
+            const hoursSinceStart = Math.floor((now - forecastStart) / (3600 * 1000));
+            const currentFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
             
-            // Show a brief status message
-            updateStatus('Map view reset to original position', 'success');
+            // Stop animation if playing
+            if (state.isPlaying) {
+                stopAnimation();
+            }
+            
+            // Show the spatial plot for the current time
+            showFrame(currentFH);
+            
+            // Reset map view to original position: center [29.5, 79.5] with zoom level 7
+            state.map.setView([29.5, 79.5], 7);
             
             // Clear click marker if it exists
             if (state.markers.clickMarker) {
                 state.map.removeLayer(state.markers.clickMarker);
                 state.markers.clickMarker = null;
             }
+            
+            // Show a brief status message with the current forecast hour
+            updateStatus(`Reset to current forecast hour (+${currentFH}h)`, 'success');
         }
 
         // ==================== GRID & DATA ====================
