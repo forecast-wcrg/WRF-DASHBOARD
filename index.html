@@ -1962,7 +1962,7 @@
                 
                 html += `<div class="forecast-item ${isNow ? 'current-hour' : ''}">
                     <div class="forecast-time">${isNow ? '<i class="fas fa-clock"></i> ' : ''}${item.formattedTime}</div>
-                    <div class="forecast-temp" style="color: ${valueColor}; font-weight: 700;">${item.value.toFixed(varConfig.precision)}${varConfig.unit === '°C' ? '°' : ''}${varConfig.unit}</div>
+                    <div class="forecast-temp" style="color: ${valueColor};">${item.value.toFixed(varConfig.precision)}${varConfig.unit}</div>
                     <div class="forecast-icon">${icon}</div>
                     <div class="forecast-hour">+${item.fh}h</div>
                 </div>`;
