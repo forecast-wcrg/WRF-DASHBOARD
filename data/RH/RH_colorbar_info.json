@@ -1,7 +1,7 @@
 {
   "variable": "RH",
-  "colorbar_min": 4.0,
-  "colorbar_max": 72.0,
+  "colorbar_min": 5.0,
+  "colorbar_max": 67.0,
   "unit": "%",
   "percentiles_used": "2-98%",
   "actual_data_min": 0.0,

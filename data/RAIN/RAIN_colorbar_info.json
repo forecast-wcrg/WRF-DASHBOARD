@@ -4,8 +4,8 @@
   "colorbar_max": 1.0,
   "unit": "mm",
   "percentiles_used": "2-98%",
-  "actual_data_min": -2.1397799088163083e-08,
-  "actual_data_max": 8.617799758911133,
+  "actual_data_min": -1.0464574984325736e-08,
+  "actual_data_max": 8.686546325683594,
   "colorbar_size": {
     "width_inches": 24,
     "height_inches": 2,
