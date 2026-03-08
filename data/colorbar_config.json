@@ -1,16 +1,16 @@
 {
   "T2": {
     "name": "T2",
-    "colorbar_min": -14.0,
-    "colorbar_max": 38.0,
+    "colorbar_min": -17.0,
+    "colorbar_max": 37.0,
     "unit": "\u00b0C",
     "cmap": "coolwarm",
     "display_name": "T2"
   },
   "RH": {
     "name": "RH",
-    "colorbar_min": 4.0,
-    "colorbar_max": 80.0,
+    "colorbar_min": 3.0,
+    "colorbar_max": 95.0,
     "unit": "%",
     "cmap": "viridis",
     "display_name": "RH"
