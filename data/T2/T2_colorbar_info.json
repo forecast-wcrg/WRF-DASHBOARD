@@ -1,15 +1,22 @@
 {
   "variable": "T2",
-  "colorbar_min": -17.0,
-  "colorbar_max": 37.0,
+  "colorbar_min": -14.0,
+  "colorbar_max": 38.0,
   "unit": "\u00b0C",
   "percentiles_used": "2-98%",
-  "actual_data_min": -32.87034606933594,
-  "actual_data_max": 39.608551025390625,
-  "colorbar_size": {
-    "width_inches": 24,
-    "height_inches": 2,
-    "tick_fontsize": 16,
-    "title_fontsize": 18
-  }
+  "actual_data_min": -32.82597351074219,
+  "actual_data_max": 41.38092041015625,
+  "ticks": [
+    -14,
+    -9,
+    -4,
+    1,
+    6,
+    11,
+    16,
+    21,
+    26,
+    31,
+    36
+  ]
 }

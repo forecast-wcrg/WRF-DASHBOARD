@@ -947,7 +947,7 @@
             align-items: center;
             justify-content: space-between;
             padding: 0 30px;
-            font-size: 1.1rem;
+            font-size: 1.4rem;
             font-weight: 500;
         }
 
@@ -1087,7 +1087,13 @@
                 <!-- Variable Selection -->
                 <div class="control-section">
                     <h3><i class="fas fa-sliders-h"></i> Controls</h3>
-                    <div class="control-group"><label for="varSelect"><i class="fas fa-chart-line"></i> Variable</label><select id="varSelect" class="styled-select"><option value="T2">2m Temperature (°C)</option><option value="RH">Relative Humidity (%)</option><option value="WIND">Wind Speed (m/s)</option><option value="RAIN">Hourly Rainfall (mm)</option></select></div>
+                    <div class="control-group"><label for="varSelect"><i class="fas fa-chart-line"></i> Variable</label><select id="varSelect" class="styled-select">
+                        <option value="T2">2m Temperature (°C)</option>
+                        <option value="RH">Relative Humidity (%)</option>
+                        <option value="WIND">Wind Speed (m/s)</option>
+                        <option value="RAIN">Hourly Rainfall (mm)</option>
+                        <option value="DAILY_RAIN">Daily Rainfall (mm)</option>
+                    </select></div>
                     <div class="control-group"><label for="speedSelect"><i class="fas fa-tachometer-alt"></i> Animation Speed</label><select id="speedSelect" class="styled-select"><option value="0.25">0.25× Slow</option><option value="0.5">0.5× Moderate</option><option value="1" selected>1× Normal</option><option value="2">2× Fast</option><option value="3">3× Very Fast</option></select></div>
                 </div>
 
@@ -1181,7 +1187,7 @@
         </div>
     </div>
 
-    <!-- BOTTOM STRIP - EXACT SAME STYLE (WITHOUT VISITOR COUNT) -->
+    <!-- BOTTOM STRIP -->
     <div class="bottom-strip">
         <div class="bottom-strip-left">
             <span class="bottom-strip-text">
@@ -1193,27 +1199,34 @@
             <div class="bottom-strip-text">Frontend & Backend Developed and Maintained by</div>
             <span class="bottom-strip-divider"></span>
             <a href="https://singhshiwam.github.io/" target="_blank" class="bottom-strip-link">
-                <i class="fab fa-github"></i> Shiwam Singh
+                Shiwam Singh
             </a>
         </div>
+        <div class="bottom-strip-center">
+            <span class="bottom-strip-divider"></span>
+            <a href="https://www.weatherxplorers.com/mausam-drishti/mausamdrishti-gfs" target="_blank" class="bottom-strip-link">
+                GFS - Forecast
+            </a>
+        </div>    
         
-        <div class="bottom-strip-right">
-            <a href="http://www.weatherxplorers.com/" target="_blank" class="bottom-strip-link">
-                <i class="fas fa-globe"></i> www.weatherxplorers.com
+        <div class="bottom-strip-center">
+            <span class="bottom-strip-divider"></span>
+            <a href="https://www.weatherxplorers.com/mausam-drishti/mausamdrishti-icon" target="_blank" class="bottom-strip-link">
+                ICON - Forecast
             </a>
-        </div>
+        </div>         
     </div>
         
     
     </div>
 
-    <!-- Leaflet JS and scripts (identical to original, omitted for brevity but included in final answer) -->
+    <!-- Leaflet JS and scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
 
         // ==================== CONFIGURATION ====================
         const CONFIG = {
-            forecastStart: new Date("2026-03-07T05:30:00+05:30"),
+            forecastStart: new Date("2026-03-09T05:30:00+05:30"),
             baseFrameTime: 1000,
             debugMode: true,
             wrfBounds: [[28.2639, 76.6887], [31.6276, 81.1533]],
@@ -1222,8 +1235,11 @@
                 T2: { name: "2m Temperature", unit: "°C", precision: 1, icon: "fa-thermometer-half" },
                 RH: { name: "Relative Humidity", unit: "%", precision: 0, icon: "fa-tint" },
                 WIND: { name: "Wind Speed", unit: "m/s", precision: 1, icon: "fa-wind" },
-                RAIN: { name: "Hourly Rainfall", unit: "mm", precision: 2, icon: "fa-cloud-rain" }
+                RAIN: { name: "Hourly Rainfall", unit: "mm", precision: 2, icon: "fa-cloud-rain" },
+                DAILY_RAIN: { name: "Daily Rainfall", unit: "mm", precision: 2, icon: "fa-cloud-rain", isDaily: true }
             },
+            // Daily rainfall indices: 23, 47, 71, 95, 119, 143, 167, 191, 215, 239, 263, 287, 311, 335, 359
+            dailyRainIndices: [23, 47, 71, 95, 119, 143, 167, 191, 215, 239, 263, 287, 311, 335, 359],
             defaultLocation: { lat: 29.8625, lon: 77.8915278, name: "IIT Roorkee" }
         };
 
@@ -1252,8 +1268,11 @@
             searchTimeout: null,
             hourlyForecastData: {},
             defaultLocationPreloaded: false,
-            realTimeUpdateTimer: null,  // NEW: Timer for real-time updates
-            lastRealTimeCheck: 0        // NEW: Last check time
+            realTimeUpdateTimer: null,
+            lastRealTimeCheck: 0,
+            // Daily rain specific
+            dailyRainCurrentIndex: 0, // Index in dailyRainIndices array
+            isDailyRainMode: false
         };
 
         // ==================== UI ELEMENTS ====================
@@ -1338,6 +1357,39 @@
             setTimeout(updateCurrentDateTime, 60000);
         }
 
+        // ==================== DAILY RAIN HELPER FUNCTIONS ====================
+        function getDailyRainIndexFromFH(fh) {
+            // Find the closest daily index that's <= fh
+            for (let i = CONFIG.dailyRainIndices.length - 1; i >= 0; i--) {
+                if (CONFIG.dailyRainIndices[i] <= fh) {
+                    return i;
+                }
+            }
+            return 0;
+        }
+
+        function getFHFromDailyIndex(index) {
+            if (index >= 0 && index < CONFIG.dailyRainIndices.length) {
+                return CONFIG.dailyRainIndices[index];
+            }
+            return 0;
+        }
+
+        function updateSliderForDailyRain() {
+            // When in daily rain mode, slider should have 15 steps (0-14) representing the 15 daily frames
+            elements.slider.min = 0;
+            elements.slider.max = CONFIG.dailyRainIndices.length - 1;
+            elements.slider.step = 1;
+            elements.slider.value = state.dailyRainCurrentIndex;
+        }
+
+        function updateSliderForNormalMode() {
+            elements.slider.min = 0;
+            elements.slider.max = state.totalForecastHours;
+            elements.slider.step = 1;
+            elements.slider.value = state.currentFH;
+        }
+
         // ==================== THEME ====================
         function setupThemeToggle() {
             const savedTheme = localStorage.getItem('wrfTheme') || 'light';
@@ -1378,10 +1430,10 @@
             state.map = L.map('map', { 
                 attributionControl: false, 
                 zoomControl: true, 
-                minZoom: 7.49,              // Minimum zoom level (zoomed out limit)
-                maxZoom: 15,              // Maximum zoom level (zoomed in limit)
-                maxBounds: CONFIG.mapViewBounds,  // Restrict panning to these bounds
-                maxBoundsViscosity: 1.0,  // Make bounds completely restrictive
+                minZoom: 7.49,
+                maxZoom: 15,
+                maxBounds: CONFIG.mapViewBounds,
+                maxBoundsViscosity: 1.0,
                 zoomControl: false, 
                 preferCanvas: true, 
                 fadeAnimation: false, 
@@ -1390,10 +1442,8 @@
             
             L.control.zoom({ position: 'bottomright' }).addTo(state.map);
             
-            // Set the initial view
             state.map.setView([29.5, 79.5], 7);
             
-            // Add boundary layer
             state.markers.boundaryLayer = L.rectangle(CONFIG.wrfBounds, { 
                 color: '#FF4444', 
                 weight: 1, 
@@ -1403,7 +1453,6 @@
                 dashArray: '5, 5' 
             }).addTo(state.map);
             
-            // Force the map to stay within bounds when user tries to zoom out
             state.map.on('zoomend', function() {
                 if (state.map.getZoom() < state.map.getMinZoom()) {
                     state.map.setZoom(state.map.getMinZoom());
@@ -1418,30 +1467,23 @@
 
         // ==================== MAP RESET FUNCTION ====================
         function resetMapView() {
-            // First, check if we need to reset to current forecast hour
             const now = new Date();
             const forecastStart = CONFIG.forecastStart;
             const hoursSinceStart = Math.floor((now - forecastStart) / (3600 * 1000));
             const currentFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
             
-            // Stop animation if playing
             if (state.isPlaying) {
                 stopAnimation();
             }
             
-            // Show the spatial plot for the current time
             showFrame(currentFH);
-            
-            // Reset map view to original position: center [29.5, 79.5] with zoom level 7
             state.map.setView([29.5, 79.5], 7);
             
-            // Clear click marker if it exists
             if (state.markers.clickMarker) {
                 state.map.removeLayer(state.markers.clickMarker);
                 state.markers.clickMarker = null;
             }
             
-            // Show a brief status message with the current forecast hour
             updateStatus(`Reset to current forecast hour (+${currentFH}h)`, 'success');
         }
 
@@ -1469,24 +1511,59 @@
 
         async function loadGridData(fh) {
             const variable = elements.varSelect.value;
-            const cacheKey = `${variable}_${fh}`;
-            if (state.allGrids[cacheKey]) { state.currentGrid = state.allGrids[cacheKey]; return true; }
-            try {
-                updateStatus(`Loading ${CONFIG.variables[variable].name} data...`, 'info');
-                const paddedFH = fh.toString().padStart(3, '0');
-                const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const gridData = await response.json();
-                if (!gridData || !gridData.values || !gridData.ny || !gridData.nx) throw new Error('Invalid JSON structure');
-                state.allGrids[cacheKey] = gridData;
-                state.currentGrid = gridData;
-                updateStatus(`Data loaded for FH ${fh}`, 'success');
-                return true;
-            } catch (error) {
-                debug(`Failed to load grid: ${error.message}`, 'error');
-                state.currentGrid = createTestGrid();
-                updateStatus(`Loading data...`, 'warn');
-                return false;
+            
+            // Handle daily rain special case
+            if (variable === 'DAILY_RAIN') {
+                // Convert slider index to actual FH
+                const actualFH = getFHFromDailyIndex(fh);
+                const cacheKey = `${variable}_${actualFH}`;
+                
+                if (state.allGrids[cacheKey]) { 
+                    state.currentGrid = state.allGrids[cacheKey]; 
+                    return true; 
+                }
+                
+                try {
+                    updateStatus(`Loading Daily Rainfall data for FH ${actualFH}...`, 'info');
+                    const paddedFH = actualFH.toString().padStart(3, '0');
+                    const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const gridData = await response.json();
+                    if (!gridData || !gridData.values || !gridData.ny || !gridData.nx) throw new Error('Invalid JSON structure');
+                    state.allGrids[cacheKey] = gridData;
+                    state.currentGrid = gridData;
+                    updateStatus(`Daily Rainfall data loaded for FH ${actualFH}`, 'success');
+                    return true;
+                } catch (error) {
+                    debug(`Failed to load daily rain grid: ${error.message}`, 'error');
+                    state.currentGrid = createTestGrid();
+                    updateStatus(`Loading daily rainfall data...`, 'warn');
+                    return false;
+                }
+            } else {
+                // Normal variable
+                const cacheKey = `${variable}_${fh}`;
+                if (state.allGrids[cacheKey]) { 
+                    state.currentGrid = state.allGrids[cacheKey]; 
+                    return true; 
+                }
+                try {
+                    updateStatus(`Loading ${CONFIG.variables[variable].name} data...`, 'info');
+                    const paddedFH = fh.toString().padStart(3, '0');
+                    const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const gridData = await response.json();
+                    if (!gridData || !gridData.values || !gridData.ny || !gridData.nx) throw new Error('Invalid JSON structure');
+                    state.allGrids[cacheKey] = gridData;
+                    state.currentGrid = gridData;
+                    updateStatus(`Data loaded for FH ${fh}`, 'success');
+                    return true;
+                } catch (error) {
+                    debug(`Failed to load grid: ${error.message}`, 'error');
+                    state.currentGrid = createTestGrid();
+                    updateStatus(`Loading data...`, 'warn');
+                    return false;
+                }
             }
         }
 
@@ -1508,8 +1585,16 @@
 
         async function updateMapLayer(fh) {
             const variable = elements.varSelect.value;
-            const paddedFH = fh.toString().padStart(3, '0');
+            
+            // Handle daily rain special case
+            let actualFH = fh;
+            if (variable === 'DAILY_RAIN') {
+                actualFH = getFHFromDailyIndex(fh);
+            }
+            
+            const paddedFH = actualFH.toString().padStart(3, '0');
             const imagePath = `data/${variable}/${variable}_fc_${paddedFH}.png`;
+            
             return new Promise((resolve) => {
                 const img = new Image();
                 img.crossOrigin = "Anonymous";
@@ -1563,28 +1648,49 @@
             elements.cbar.onerror = () => { elements.cbar.style.display = 'none'; };
             elements.cbar.onload = () => { elements.cbar.style.display = 'block'; };
             
-            // Update the forecast badge when variable changes
             if (state.currentLocation) {
                 loadHourlyForecast(state.currentLocation.lat, state.currentLocation.lon);
             }
         }
 
         function updateTimeDisplay(fh) {
-            elements.timeLabel.textContent = `+${fh} h`;
-            elements.currentFH.textContent = fh;
-            const forecastStart = CONFIG.forecastStart;
-            const validTime = new Date(forecastStart.getTime() + fh * 3600 * 1000);
-            elements.fcStart.textContent = formatISTTime(forecastStart);
-            elements.fcValid.textContent = formatISTTime(validTime);
+            const variable = elements.varSelect.value;
+            
+            if (variable === 'DAILY_RAIN') {
+                const actualFH = getFHFromDailyIndex(fh);
+                elements.timeLabel.textContent = `Day ${fh + 1} (+${actualFH}h)`;
+                elements.currentFH.textContent = actualFH;
+                
+                const forecastStart = CONFIG.forecastStart;
+                const validTime = new Date(forecastStart.getTime() + actualFH * 3600 * 1000);
+                elements.fcStart.textContent = formatISTTime(forecastStart);
+                elements.fcValid.textContent = formatISTTime(validTime);
+            } else {
+                elements.timeLabel.textContent = `+${fh} h`;
+                elements.currentFH.textContent = fh;
+                const forecastStart = CONFIG.forecastStart;
+                const validTime = new Date(forecastStart.getTime() + fh * 3600 * 1000);
+                elements.fcStart.textContent = formatISTTime(forecastStart);
+                elements.fcValid.textContent = formatISTTime(validTime);
+            }
         }
 
         async function showFrame(fh) {
-            state.currentFH = fh;
+            const variable = elements.varSelect.value;
+            
+            if (variable === 'DAILY_RAIN') {
+                state.dailyRainCurrentIndex = fh;
+                state.currentFH = getFHFromDailyIndex(fh);
+            } else {
+                state.currentFH = fh;
+            }
+            
             elements.slider.value = fh;
             updateTimeDisplay(fh);
             updateVariableDisplay();
             await loadGridData(fh);
             await updateMapLayer(fh);
+            
             if (state.lastClickPos) {
                 const { lat, lng } = state.lastClickPos;
                 updateCoordinateDisplay(lat, lng);
@@ -1593,23 +1699,20 @@
             if (state.currentLocation) updateCurrentConditions(state.currentLocation.lat, state.currentLocation.lon);
         }
 
-        // ==================== REAL-TIME UPDATE FUNCTION (NEW) ====================
+        // ==================== REAL-TIME UPDATE FUNCTION ====================
         function checkAndUpdateRealTime() {
             const now = new Date();
             const forecastStart = CONFIG.forecastStart;
             const hoursSinceStart = Math.floor((now - forecastStart) / (3600 * 1000));
             
-            // Only update if we're not in animation mode and the hour has changed
             if (!state.isPlaying && hoursSinceStart !== state.lastRealTimeCheck) {
                 const targetFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
                 
-                // Update to current forecast hour if it's different from displayed
-                if (targetFH !== state.currentFH) {
+                if (targetFH !== state.currentFH && elements.varSelect.value !== 'DAILY_RAIN') {
                     debug(`Real-time update: Moving from FH ${state.currentFH} to FH ${targetFH}`);
                     showFrame(targetFH);
                 }
                 
-                // Update current conditions time and data regardless
                 if (state.currentLocation) {
                     updateCurrentConditions(state.currentLocation.lat, state.currentLocation.lon);
                 }
@@ -1620,12 +1723,10 @@
 
         // Start real-time monitoring
         function startRealTimeMonitoring() {
-            // Check every 30 seconds
             state.realTimeUpdateTimer = setInterval(() => {
                 checkAndUpdateRealTime();
-            }, 30000); // 30 seconds
+            }, 30000);
             
-            // Initial check
             checkAndUpdateRealTime();
         }
 
@@ -1640,7 +1741,6 @@
             state.timer = null;
             elements.playBtn.innerHTML = '<i class="fas fa-play"></i> Play';
             
-            // After stopping animation, check if we need to update to current time
             setTimeout(() => checkAndUpdateRealTime(), 100);
         }
 
@@ -1648,10 +1748,22 @@
             if (state.isPlaying) return;
             state.isPlaying = true;
             elements.playBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
-            state.timer = setInterval(() => {
-                let nextFH = (state.currentFH < state.totalForecastHours) ? state.currentFH + 1 : 0;
-                showFrame(nextFH);
-            }, CONFIG.baseFrameTime / state.currentSpeed);
+            
+            const variable = elements.varSelect.value;
+            
+            if (variable === 'DAILY_RAIN') {
+                // Daily rain has 15 frames
+                state.timer = setInterval(() => {
+                    let nextIndex = (state.dailyRainCurrentIndex < CONFIG.dailyRainIndices.length - 1) ? 
+                                    state.dailyRainCurrentIndex + 1 : 0;
+                    showFrame(nextIndex);
+                }, CONFIG.baseFrameTime / state.currentSpeed * 2); // Slightly slower for daily
+            } else {
+                state.timer = setInterval(() => {
+                    let nextFH = (state.currentFH < state.totalForecastHours) ? state.currentFH + 1 : 0;
+                    showFrame(nextFH);
+                }, CONFIG.baseFrameTime / state.currentSpeed);
+            }
         }
 
         async function detectTotalForecastHours() {
@@ -1668,11 +1780,10 @@
             return 359;
         }
 
-        // ==================== LOCATION & SEARCH (FIXED - SHOWS ALL LOCATIONS WITH DOMAIN CHECK) ====================
+        // ==================== LOCATION & SEARCH ====================
         function goToLocation(lat, lon, name, shouldZoom = false) {
             if (!isInWRFDomain(lat, lon)) {
                 updateStatus('Location outside WRF domain - cannot show forecast', 'warn');
-                // Still show location on map but with warning
                 if (shouldZoom) state.map.setView([lat, lon], 7);
                 else state.map.panTo([lat, lon]);
                 if (state.markers.locationMarker) state.map.removeLayer(state.markers.locationMarker);
@@ -1751,14 +1862,13 @@
             );
         }
 
-        // ==================== SEARCH (FIXED - SHOWS ALL LOCATIONS WITH DOMAIN CHECK) ====================
+        // ==================== SEARCH ====================
         async function searchLocation(query) {
             if (!query || query.length < 3) { 
                 elements.searchResults.style.display = 'none'; 
                 return; 
             }
             try {
-                // Search across India, not just Uttarakhand, to get all possible locations
                 const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, India&limit=10&addressdetails=1`);
                 const results = await response.json();
                 
@@ -1773,7 +1883,6 @@
                         const item = document.createElement('div');
                         item.className = `search-result-item ${!insideDomain ? 'outside-domain' : ''}`;
                         
-                        // Get a clean display name
                         const displayName = result.display_name.split(',').slice(0,3).join(',');
                         const stateMatch = result.display_name.match(/(Uttarakhand|Uttar Pradesh|Himachal Pradesh|Haryana|Delhi|Punjab)/i);
                         const stateName = stateMatch ? stateMatch[0] : 'Other';
@@ -1818,7 +1927,7 @@
             }
         }
 
-        // ==================== CURRENT CONDITIONS (DYNAMIC TIME) ====================
+        // ==================== CURRENT CONDITIONS ====================
         async function updateCurrentConditions(lat, lon) {
             if (!isInWRFDomain(lat, lon)) {
                 elements.currentConditions.style.display = 'none';
@@ -1828,13 +1937,11 @@
             elements.currentConditions.style.display = 'block';
             elements.currentLocation.textContent = state.locationName || 'Selected Location';
             
-            // Get current forecast hour based on current time
             const now = new Date();
             const forecastStart = CONFIG.forecastStart;
             const hoursSinceStart = Math.floor((now - forecastStart) / (3600 * 1000));
             const currentFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
             
-            // Update time display with current IST time
             elements.conditionsTime.textContent = now.toLocaleTimeString('en-IN', { 
                 timeZone: 'Asia/Kolkata', 
                 hour: '2-digit', 
@@ -1882,11 +1989,9 @@
             const gridIndex = latLonToGridIndex(lat, lon);
             if (!gridIndex) return;
             
-            // Get current selected variable
             const variable = elements.varSelect.value;
             const varConfig = CONFIG.variables[variable];
             
-            // Update the forecast badge with current variable
             elements.forecastVariableBadge.textContent = varConfig.name;
             
             elements.hourlyForecast.innerHTML = `<div class="forecast-loading"><div class="loading-spinner-small"></div><span>Loading hourly ${varConfig.name} forecast...</span></div>`;
@@ -1897,35 +2002,69 @@
             const startFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
             const forecastData = [];
             
-            for (let hour = 0; hour < 24; hour++) {
-                const fh = startFH + hour;
-                if (fh > state.totalForecastHours) break;
-                const cacheKey = `${variable}_${fh}`;
-                if (!state.allGrids[cacheKey]) {
-                    try {
-                        const paddedFH = fh.toString().padStart(3, '0');
-                        const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
-                        if (response.ok) {
-                            const gridData = await response.json();
-                            state.allGrids[cacheKey] = gridData;
+            if (variable === 'DAILY_RAIN') {
+                // For daily rain, show next 15 days (all available daily frames)
+                for (let i = 0; i < CONFIG.dailyRainIndices.length; i++) {
+                    const fh = CONFIG.dailyRainIndices[i];
+                    const cacheKey = `${variable}_${fh}`;
+                    if (!state.allGrids[cacheKey]) {
+                        try {
+                            const paddedFH = fh.toString().padStart(3, '0');
+                            const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
+                            if (response.ok) {
+                                const gridData = await response.json();
+                                state.allGrids[cacheKey] = gridData;
+                            }
+                        } catch (error) { continue; }
+                    }
+                    if (state.allGrids[cacheKey] && state.allGrids[cacheKey].values) {
+                        const gridData = state.allGrids[cacheKey];
+                        if (gridData.values[gridIndex.i] && gridData.values[gridIndex.i][gridIndex.j] !== undefined) {
+                            const value = gridData.values[gridIndex.i][gridIndex.j];
+                            const forecastTime = new Date(forecastStart.getTime() + fh * 3600 * 1000);
+                            forecastData.push({ 
+                                hour: i, 
+                                fh: fh, 
+                                time: forecastTime, 
+                                value: value, 
+                                formattedTime: `Day ${i+1}` 
+                            });
                         }
-                    } catch (error) { continue; }
+                    }
                 }
-                if (state.allGrids[cacheKey] && state.allGrids[cacheKey].values) {
-                    const gridData = state.allGrids[cacheKey];
-                    if (gridData.values[gridIndex.i] && gridData.values[gridIndex.i][gridIndex.j] !== undefined) {
-                        const value = gridData.values[gridIndex.i][gridIndex.j];
-                        const forecastTime = new Date(forecastStart.getTime() + fh * 3600 * 1000);
-                        forecastData.push({ 
-                            hour: hour, 
-                            fh: fh, 
-                            time: forecastTime, 
-                            value: value, 
-                            formattedTime: formatHourlyTime(forecastTime) 
-                        });
+            } else {
+                // Normal hourly forecast
+                for (let hour = 0; hour < 24; hour++) {
+                    const fh = startFH + hour;
+                    if (fh > state.totalForecastHours) break;
+                    const cacheKey = `${variable}_${fh}`;
+                    if (!state.allGrids[cacheKey]) {
+                        try {
+                            const paddedFH = fh.toString().padStart(3, '0');
+                            const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
+                            if (response.ok) {
+                                const gridData = await response.json();
+                                state.allGrids[cacheKey] = gridData;
+                            }
+                        } catch (error) { continue; }
+                    }
+                    if (state.allGrids[cacheKey] && state.allGrids[cacheKey].values) {
+                        const gridData = state.allGrids[cacheKey];
+                        if (gridData.values[gridIndex.i] && gridData.values[gridIndex.i][gridIndex.j] !== undefined) {
+                            const value = gridData.values[gridIndex.i][gridIndex.j];
+                            const forecastTime = new Date(forecastStart.getTime() + fh * 3600 * 1000);
+                            forecastData.push({ 
+                                hour: hour, 
+                                fh: fh, 
+                                time: forecastTime, 
+                                value: value, 
+                                formattedTime: formatHourlyTime(forecastTime) 
+                            });
+                        }
                     }
                 }
             }
+            
             state.hourlyForecastData[`${lat.toFixed(4)}_${lon.toFixed(4)}_${variable}`] = forecastData;
             renderHourlyForecast(forecastData, variable);
         }
@@ -1942,7 +2081,6 @@
             forecastData.forEach((item, index) => {
                 const isNow = index === 0;
                 
-                // Different styling based on variable type
                 let valueColor = 'white';
                 let icon = '';
                 
@@ -1955,7 +2093,7 @@
                 } else if (variable === 'WIND') {
                     valueColor = item.value < 2 ? '#a3e635' : (item.value < 5 ? '#fbbf24' : (item.value < 10 ? '#f97316' : '#ef4444'));
                     icon = '<i class="fas fa-wind"></i>';
-                } else if (variable === 'RAIN') {
+                } else if (variable === 'RAIN' || variable === 'DAILY_RAIN') {
                     valueColor = item.value < 0.5 ? '#93c5fd' : (item.value < 2 ? '#3b82f6' : (item.value < 5 ? '#2563eb' : '#1e3a8a'));
                     icon = '<i class="fas fa-cloud-rain"></i>';
                 }
@@ -1971,41 +2109,73 @@
             elements.hourlyForecast.innerHTML = html;
         }
 
-        // ==================== PRELOAD ALL TIMESERIES (ALL VARIABLES) ====================
+        // ==================== PRELOAD ALL TIMESERIES ====================
         async function preloadAllTimeseriesData() {
             debug('Preloading all timeseries data for default location...');
             const lat = CONFIG.defaultLocation.lat;
             const lon = CONFIG.defaultLocation.lon;
             const gridIndex = latLonToGridIndex(lat, lon);
             if (!gridIndex) return;
-            const variables = ['T2', 'RH', 'WIND', 'RAIN'];
+            const variables = ['T2', 'RH', 'WIND', 'RAIN', 'DAILY_RAIN'];
+            
             for (const variable of variables) {
                 const cacheKey = `${lat.toFixed(4)}_${lon.toFixed(4)}_${variable}`;
                 if (state.allTimeseriesData[cacheKey]) continue;
+                
                 const timeseriesValues = [], hours = [], timestamps = [];
-                for (let fh = 0; fh <= state.totalForecastHours; fh++) {
-                    const gridCacheKey = `${variable}_${fh}`;
-                    if (!state.allGrids[gridCacheKey]) {
-                        try {
-                            const paddedFH = fh.toString().padStart(3, '0');
-                            const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
-                            if (response.ok) {
-                                const gridData = await response.json();
-                                state.allGrids[gridCacheKey] = gridData;
+                
+                if (variable === 'DAILY_RAIN') {
+                    // Daily rain has 15 frames
+                    for (let idx = 0; idx < CONFIG.dailyRainIndices.length; idx++) {
+                        const fh = CONFIG.dailyRainIndices[idx];
+                        const gridCacheKey = `${variable}_${fh}`;
+                        if (!state.allGrids[gridCacheKey]) {
+                            try {
+                                const paddedFH = fh.toString().padStart(3, '0');
+                                const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
+                                if (response.ok) {
+                                    const gridData = await response.json();
+                                    state.allGrids[gridCacheKey] = gridData;
+                                }
+                            } catch (error) { continue; }
+                        }
+                        const gridData = state.allGrids[gridCacheKey];
+                        if (gridData && gridData.values && gridIndex.i < gridData.values.length && gridIndex.j < gridData.values[0].length) {
+                            const value = gridData.values[gridIndex.i][gridIndex.j];
+                            if (value !== null && !isNaN(value)) {
+                                timeseriesValues.push(value);
+                                hours.push(fh);
+                                timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
                             }
-                        } catch (error) { continue; }
-                    }
-                    const gridData = state.allGrids[gridCacheKey];
-                    if (gridData && gridData.values && gridIndex.i < gridData.values.length && gridIndex.j < gridData.values[0].length) {
-                        const value = gridData.values[gridIndex.i][gridIndex.j];
-                        if (value !== null && !isNaN(value)) {
-                            timeseriesValues.push(value);
-                            hours.push(fh);
-                            timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
                         }
                     }
-                    if (fh % 50 === 0) await new Promise(resolve => setTimeout(resolve, 1));
+                } else {
+                    // Normal hourly data
+                    for (let fh = 0; fh <= state.totalForecastHours; fh++) {
+                        const gridCacheKey = `${variable}_${fh}`;
+                        if (!state.allGrids[gridCacheKey]) {
+                            try {
+                                const paddedFH = fh.toString().padStart(3, '0');
+                                const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
+                                if (response.ok) {
+                                    const gridData = await response.json();
+                                    state.allGrids[gridCacheKey] = gridData;
+                                }
+                            } catch (error) { continue; }
+                        }
+                        const gridData = state.allGrids[gridCacheKey];
+                        if (gridData && gridData.values && gridIndex.i < gridData.values.length && gridIndex.j < gridData.values[0].length) {
+                            const value = gridData.values[gridIndex.i][gridIndex.j];
+                            if (value !== null && !isNaN(value)) {
+                                timeseriesValues.push(value);
+                                hours.push(fh);
+                                timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
+                            }
+                        }
+                        if (fh % 50 === 0) await new Promise(resolve => setTimeout(resolve, 1));
+                    }
                 }
+                
                 state.allTimeseriesData[cacheKey] = { lat, lon, gridI: gridIndex.i, gridJ: gridIndex.j, variable, values: timeseriesValues, hours, timestamps };
                 debug(`Preloaded ${variable} timeseries (${timeseriesValues.length} points)`);
             }
@@ -2013,10 +2183,10 @@
             updateStatus('All timeseries preloaded', 'success');
         }
 
-        // ==================== TIMESERIES CHART (FAST CLICK) ====================
+        // ==================== TIMESERIES CHART ====================
         async function fetchTimeseriesData(lat, lon, variable, gridI, gridJ) {
             const cacheKey = `${lat.toFixed(4)}_${lon.toFixed(4)}_${variable}`;
-            // Return immediately if already cached
+            
             if (state.allTimeseriesData[cacheKey]) {
                 state.timeseriesData = state.allTimeseriesData[cacheKey];
                 return true;
@@ -2025,35 +2195,74 @@
             state.isLoadingTimeseries = true;
             elements.chartLoading.style.display = 'flex';
             elements.progressFill.style.width = '0%';
+            
             try {
                 updateStatus(`Loading timeseries data for ${variable}...`, 'info');
                 const timeseriesValues = [], hours = [], timestamps = [];
-                const totalHours = state.totalForecastHours;
-                for (let fh = 0; fh <= totalHours; fh++) {
-                    elements.progressFill.style.width = `${Math.round((fh / totalHours) * 100)}%`;
-                    elements.loadingText.textContent = `Loading hour ${fh}/${totalHours}...`;
-                    if (fh % 20 === 0) await new Promise(resolve => setTimeout(resolve, 1));
-                    const cacheKeyGrid = `${variable}_${fh}`;
-                    if (!state.allGrids[cacheKeyGrid]) {
-                        try {
-                            const paddedFH = fh.toString().padStart(3, '0');
-                            const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
-                            if (response.ok) {
-                                const gridData = await response.json();
-                                state.allGrids[cacheKeyGrid] = gridData;
+                
+                if (variable === 'DAILY_RAIN') {
+                    const totalDays = CONFIG.dailyRainIndices.length;
+                    for (let idx = 0; idx < totalDays; idx++) {
+                        const fh = CONFIG.dailyRainIndices[idx];
+                        elements.progressFill.style.width = `${Math.round((idx / totalDays) * 100)}%`;
+                        elements.loadingText.textContent = `Loading day ${idx+1}/${totalDays}...`;
+                        
+                        if (idx % 5 === 0) await new Promise(resolve => setTimeout(resolve, 1));
+                        
+                        const cacheKeyGrid = `${variable}_${fh}`;
+                        if (!state.allGrids[cacheKeyGrid]) {
+                            try {
+                                const paddedFH = fh.toString().padStart(3, '0');
+                                const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
+                                if (response.ok) {
+                                    const gridData = await response.json();
+                                    state.allGrids[cacheKeyGrid] = gridData;
+                                }
+                            } catch (error) { continue; }
+                        }
+                        
+                        const gridData = state.allGrids[cacheKeyGrid];
+                        if (gridData && gridData.values && gridI < gridData.values.length && gridJ < gridData.values[0].length) {
+                            const value = gridData.values[gridI][gridJ];
+                            if (value !== null && !isNaN(value)) {
+                                timeseriesValues.push(value);
+                                hours.push(fh);
+                                timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
                             }
-                        } catch (error) { continue; }
+                        }
                     }
-                    const gridData = state.allGrids[cacheKeyGrid];
-                    if (gridData && gridData.values && gridI < gridData.values.length && gridJ < gridData.values[0].length) {
-                        const value = gridData.values[gridI][gridJ];
-                        if (value !== null && !isNaN(value)) {
-                            timeseriesValues.push(value);
-                            hours.push(fh);
-                            timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
+                } else {
+                    const totalHours = state.totalForecastHours;
+                    for (let fh = 0; fh <= totalHours; fh++) {
+                        elements.progressFill.style.width = `${Math.round((fh / totalHours) * 100)}%`;
+                        elements.loadingText.textContent = `Loading hour ${fh}/${totalHours}...`;
+                        
+                        if (fh % 20 === 0) await new Promise(resolve => setTimeout(resolve, 1));
+                        
+                        const cacheKeyGrid = `${variable}_${fh}`;
+                        if (!state.allGrids[cacheKeyGrid]) {
+                            try {
+                                const paddedFH = fh.toString().padStart(3, '0');
+                                const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
+                                if (response.ok) {
+                                    const gridData = await response.json();
+                                    state.allGrids[cacheKeyGrid] = gridData;
+                                }
+                            } catch (error) { continue; }
+                        }
+                        
+                        const gridData = state.allGrids[cacheKeyGrid];
+                        if (gridData && gridData.values && gridI < gridData.values.length && gridJ < gridData.values[0].length) {
+                            const value = gridData.values[gridI][gridJ];
+                            if (value !== null && !isNaN(value)) {
+                                timeseriesValues.push(value);
+                                hours.push(fh);
+                                timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
+                            }
                         }
                     }
                 }
+                
                 state.timeseriesData = { lat, lon, gridI, gridJ, variable, values: timeseriesValues, hours, timestamps };
                 state.allTimeseriesData[cacheKey] = state.timeseriesData;
                 updateStatus(`Timeseries data loaded (${timeseriesValues.length} points)`, 'success');
@@ -2072,18 +2281,24 @@
             elements.chartModal.style.display = 'block';
             elements.chartTitle.textContent = `${CONFIG.variables[variable].name} Timeseries`;
             elements.chartSubtitle.textContent = `📍 ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E | Grid [${gridI}, ${gridJ}]`;
+            
             if (state.chartInstance) { state.chartInstance.destroy(); state.chartInstance = null; }
-            elements.chartStats.innerHTML = `<div class="stat-item"><div class="stat-label"><i class="fas fa-spinner fa-spin"></i> Loading Data</div><div class="stat-value">Please wait...</div><div class="stat-subvalue">Loading ${state.totalForecastHours} forecast hours</div></div>`;
+            
+            elements.chartStats.innerHTML = `<div class="stat-item"><div class="stat-label"><i class="fas fa-spinner fa-spin"></i> Loading Data</div><div class="stat-value">Please wait...</div><div class="stat-subvalue">Loading forecast data</div></div>`;
             elements.downloadCSVBtn.disabled = true;
             elements.exportChartBtn.disabled = true;
+            
             const success = await fetchTimeseriesData(lat, lon, variable, gridI, gridJ);
+            
             elements.downloadCSVBtn.disabled = false;
             elements.exportChartBtn.disabled = false;
+            
             if (!success || state.timeseriesData.values.length === 0) {
                 elements.chartSubtitle.textContent = `No data available at (${lat.toFixed(4)}°, ${lon.toFixed(4)}°)`;
                 elements.chartStats.innerHTML = `<div class="stat-item"><div class="stat-label"><i class="fas fa-exclamation-triangle"></i> No Data Available</div><div class="stat-value">--</div><div class="stat-subvalue">Could not load timeseries data</div></div>`;
                 return;
             }
+            
             updateChartUI();
             createBeautifulChart();
         }
@@ -2101,6 +2316,7 @@
                 elements.chartStats.innerHTML = `<div class="stat-item"><div class="stat-label"><i class="fas fa-exclamation-triangle"></i> No Data</div><div class="stat-value">--</div><div class="stat-subvalue">No data points available</div></div>`;
                 return;
             }
+            
             const varConfig = CONFIG.variables[data.variable];
             const min = Math.min(...data.values);
             const max = Math.max(...data.values);
@@ -2123,6 +2339,7 @@
             }
             const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
             const trend = slope > 0 ? '📈 Increasing' : slope < 0 ? '📉 Decreasing' : '➡️ Stable';
+            
             const formatTime = (date) => {
                 return date.toLocaleString('en-IN', {
                     timeZone: 'Asia/Kolkata',
@@ -2131,27 +2348,28 @@
                     hour12: true
                 }).toUpperCase() + ' IST';
             };
+            
             elements.chartStats.innerHTML = `
                 <div class="stat-item">
                     <div class="stat-label"><i class="fas fa-thermometer-empty"></i> Minimum</div>
                     <div class="stat-value">${min.toFixed(varConfig.precision)} ${varConfig.unit}</div>
                     <div class="stat-subvalue">at ${formatTime(minTime)}</div>
-                    </div>
-                    <div class="stat-item">
+                </div>
+                <div class="stat-item">
                     <div class="stat-label"><i class="fas fa-thermometer-full"></i> Maximum</div>
                     <div class="stat-value">${max.toFixed(varConfig.precision)} ${varConfig.unit}</div>
                     <div class="stat-subvalue">at ${formatTime(maxTime)}</div>
-                    </div>
-                    <div class="stat-item">
+                </div>
+                <div class="stat-item">
                     <div class="stat-label"><i class="fas fa-calculator"></i> Average</div>
                     <div class="stat-value">${avg.toFixed(varConfig.precision)} ${varConfig.unit}</div>
                     <div class="stat-subvalue">Range: ${range.toFixed(varConfig.precision)}</div>
-                    </div>
-                    <div class="stat-item">
+                </div>
+                <div class="stat-item">
                     <div class="stat-label"><i class="fas fa-chart-line"></i> Statistics</div>
                     <div class="stat-value">${data.values.length} points</div>
                     <div class="stat-subvalue">${trend} (σ=${stdDev.toFixed(varConfig.precision)})</div>
-                    </div>
+                </div>
             `;
         }
 
@@ -2159,18 +2377,28 @@
             const data = state.timeseriesData;
             const varConfig = CONFIG.variables[data.variable];
             const ctx = elements.timeseriesChart.getContext('2d');
+            
             if (state.chartInstance) state.chartInstance.destroy();
-            const formattedTimes = data.timestamps.map((ts, index) => {
-                if (data.timestamps.length > 50 && index % Math.ceil(data.timestamps.length / 15) !== 0) return '';
-                return ts.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', hour: '2-digit', hour12: true }).toUpperCase();
-            });
+            
+            let formattedTimes;
+            if (data.variable === 'DAILY_RAIN') {
+                formattedTimes = data.hours.map((fh, idx) => `Day ${idx+1}`);
+            } else {
+                formattedTimes = data.timestamps.map((ts, index) => {
+                    if (data.timestamps.length > 50 && index % Math.ceil(data.timestamps.length / 15) !== 0) return '';
+                    return ts.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', hour: '2-digit', hour12: true }).toUpperCase();
+                });
+            }
+            
             const gradient = ctx.createLinearGradient(0, 0, 0, 400);
             const borderColor = state.currentTheme === 'dark' ? '#38bdf8' : '#0284c7';
             const textColor = state.currentTheme === 'dark' ? '#f1f5f9' : '#0f172a';
             const gridColor = state.currentTheme === 'dark' ? 'rgba(51,65,85,0.3)' : 'rgba(148,163,184,0.3)';
+            
             gradient.addColorStop(0, state.currentTheme === 'dark' ? 'rgba(56, 189, 248, 0.8)' : 'rgba(2, 132, 199, 0.8)');
             gradient.addColorStop(0.5, state.currentTheme === 'dark' ? 'rgba(56, 189, 248, 0.3)' : 'rgba(2, 132, 199, 0.3)');
             gradient.addColorStop(1, state.currentTheme === 'dark' ? 'rgba(56, 189, 248, 0.05)' : 'rgba(2, 132, 199, 0.05)');
+            
             state.chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -2205,18 +2433,37 @@
                             titleColor: textColor, bodyColor: textColor, borderColor: borderColor, borderWidth: 1, cornerRadius: 8, padding: 12,
                             callbacks: {
                                 title: (tooltipItems) => {
-                                    const date = data.timestamps[tooltipItems[0].dataIndex];
-                                    return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase() + ' IST';
+                                    if (data.variable === 'DAILY_RAIN') {
+                                        const idx = tooltipItems[0].dataIndex;
+                                        return `Day ${idx+1} (FH+${data.hours[idx]}h)`;
+                                    } else {
+                                        const date = data.timestamps[tooltipItems[0].dataIndex];
+                                        return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase() + ' IST';
+                                    }
                                 },
                                 label: (context) => `${varConfig.name}: ${context.parsed.y.toFixed(varConfig.precision)} ${varConfig.unit}`,
-                                afterLabel: (context) => `Forecast Hour: +${data.hours[context.dataIndex]}h`
+                                afterLabel: (context) => {
+                                    if (data.variable === 'DAILY_RAIN') {
+                                        return `Forecast Hour: +${data.hours[context.dataIndex]}h`;
+                                    } else {
+                                        return `Forecast Hour: +${data.hours[context.dataIndex]}h`;
+                                    }
+                                }
                             }
                         },
                         zoom: { pan: { enabled: true, mode: 'xy', modifierKey: 'ctrl' }, zoom: { wheel: { enabled: true, speed: 0.1 }, pinch: { enabled: true }, mode: 'xy', drag: { enabled: true } } }
                     },
                     scales: {
-                        x: { grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor, maxRotation: 45, minRotation: 45, font: { size: 11, family: "'Inter', sans-serif", weight: '500' }, maxTicksLimit: 15 }, title: { display: true, text: 'Date Time (IST)', color: textColor, font: { size: 13, weight: '600', family: "'Inter', sans-serif" } } },
-                        y: { grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor, font: { size: 12, family: "'Inter', sans-serif", weight: '500' }, callback: (value) => value.toFixed(varConfig.precision) + ' ' + varConfig.unit }, title: { display: true, text: `${varConfig.name} (${varConfig.unit})`, color: textColor, font: { size: 13, weight: '600', family: "'Inter', sans-serif" } } }
+                        x: { 
+                            grid: { color: gridColor, drawBorder: false }, 
+                            ticks: { color: textColor, maxRotation: 45, minRotation: 45, font: { size: 11, family: "'Inter', sans-serif", weight: '500' }, maxTicksLimit: 15 }, 
+                            title: { display: true, text: data.variable === 'DAILY_RAIN' ? 'Forecast Day' : 'Date Time (IST)', color: textColor, font: { size: 13, weight: '600', family: "'Inter', sans-serif" } } 
+                        },
+                        y: { 
+                            grid: { color: gridColor, drawBorder: false }, 
+                            ticks: { color: textColor, font: { size: 12, family: "'Inter', sans-serif", weight: '500' }, callback: (value) => value.toFixed(varConfig.precision) + ' ' + varConfig.unit }, 
+                            title: { display: true, text: `${varConfig.name} (${varConfig.unit})`, color: textColor, font: { size: 13, weight: '600', family: "'Inter', sans-serif" } } 
+                        }
                     },
                     interaction: { intersect: false, mode: 'index' },
                     animation: { duration: 1000, easing: 'easeOutQuart' },
@@ -2228,6 +2475,7 @@
 
         function updateChartTheme() {
             if (!state.chartInstance) return;
+            
             const data = state.timeseriesData;
             const varConfig = CONFIG.variables[data.variable];
             const ctx = elements.timeseriesChart.getContext('2d');
@@ -2235,9 +2483,11 @@
             const borderColor = state.currentTheme === 'dark' ? '#38bdf8' : '#0284c7';
             const textColor = state.currentTheme === 'dark' ? '#f1f5f9' : '#0f172a';
             const gridColor = state.currentTheme === 'dark' ? 'rgba(51,65,85,0.3)' : 'rgba(148,163,184,0.3)';
+            
             gradient.addColorStop(0, state.currentTheme === 'dark' ? 'rgba(56, 189, 248, 0.8)' : 'rgba(2, 132, 199, 0.8)');
             gradient.addColorStop(0.5, state.currentTheme === 'dark' ? 'rgba(56, 189, 248, 0.3)' : 'rgba(2, 132, 199, 0.3)');
             gradient.addColorStop(1, state.currentTheme === 'dark' ? 'rgba(56, 189, 248, 0.05)' : 'rgba(2, 132, 199, 0.05)');
+            
             state.chartInstance.options.scales.x.grid.color = gridColor;
             state.chartInstance.options.scales.x.ticks.color = textColor;
             state.chartInstance.options.scales.x.title.color = textColor;
@@ -2253,6 +2503,7 @@
             state.chartInstance.data.datasets[0].backgroundColor = gradient;
             state.chartInstance.data.datasets[0].pointBackgroundColor = borderColor;
             state.chartInstance.data.datasets[0].pointHoverBorderColor = borderColor;
+            
             state.chartInstance.update('none');
         }
 
@@ -2285,11 +2536,13 @@
                 csvContent += `Data Points: ${data.values.length}\n`;
                 csvContent += `Forecast Start: ${formatISTTime(CONFIG.forecastStart)}\n`;
                 csvContent += `\nForecast Hour,Date Time (IST),${varConfig.name} (${varConfig.unit})\n`;
+                
                 data.hours.forEach((hour, index) => {
                     const timestamp = data.timestamps[index];
                     const formattedTime = timestamp.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
                     csvContent += `${hour},${formattedTime},${data.values[index].toFixed(varConfig.precision)}\n`;
                 });
+                
                 if (data.values.length > 0) {
                     const min = Math.min(...data.values);
                     const max = Math.max(...data.values);
@@ -2298,6 +2551,7 @@
                     const stdDev = Math.sqrt(variance);
                     csvContent += `\nSummary Statistics\nMinimum,${min.toFixed(varConfig.precision)} ${varConfig.unit}\nMaximum,${max.toFixed(varConfig.precision)} ${varConfig.unit}\nAverage,${avg.toFixed(varConfig.precision)} ${varConfig.unit}\nStandard Deviation,${stdDev.toFixed(varConfig.precision)} ${varConfig.unit}\nRange,${(max - min).toFixed(varConfig.precision)} ${varConfig.unit}\nTotal Points,${data.values.length}\n`;
                 }
+                
                 const encodedUri = encodeURI(csvContent);
                 const link = document.createElement('a');
                 link.setAttribute('href', encodedUri);
@@ -2312,44 +2566,120 @@
         // ==================== EVENT LISTENERS ====================
         function setupEventListeners() {
             elements.playBtn.addEventListener('click', toggleAnimation);
+            
             elements.speedSelect.addEventListener('change', (e) => {
                 state.currentSpeed = parseFloat(e.target.value);
                 if (state.isPlaying) { stopAnimation(); startAnimation(); }
             });
-            elements.slider.addEventListener('input', (e) => { stopAnimation(); showFrame(parseInt(e.target.value)); });
+            
+            elements.slider.addEventListener('input', (e) => { 
+                stopAnimation(); 
+                showFrame(parseInt(e.target.value)); 
+            });
+            
             elements.varSelect.addEventListener('change', () => { 
                 stopAnimation(); 
                 state.allGrids = {}; 
-                detectTotalForecastHours().then(() => {
-                    showFrame(state.currentFH);
-                    if (state.currentLocation) {
-                        loadHourlyForecast(state.currentLocation.lat, state.currentLocation.lon);
-                    }
-                }); 
+                
+                const variable = elements.varSelect.value;
+                
+                if (variable === 'DAILY_RAIN') {
+                    // Switch to daily rain mode
+                    state.isDailyRainMode = true;
+                    state.dailyRainCurrentIndex = getDailyRainIndexFromFH(state.currentFH);
+                    updateSliderForDailyRain();
+                    
+                    // Show the closest daily frame
+                    showFrame(state.dailyRainCurrentIndex);
+                } else {
+                    // Switch to normal mode
+                    state.isDailyRainMode = false;
+                    updateSliderForNormalMode();
+                    
+                    detectTotalForecastHours().then(() => {
+                        showFrame(state.currentFH);
+                    });
+                }
+                
+                if (state.currentLocation) {
+                    loadHourlyForecast(state.currentLocation.lat, state.currentLocation.lon);
+                }
             });
-            elements.nextBtn.addEventListener('click', () => { stopAnimation(); showFrame(Math.min(state.currentFH + 1, state.totalForecastHours)); });
-            elements.prevBtn.addEventListener('click', () => { stopAnimation(); showFrame(Math.max(state.currentFH - 1, 0)); });
+            
+            elements.nextBtn.addEventListener('click', () => { 
+                stopAnimation(); 
+                const variable = elements.varSelect.value;
+                
+                if (variable === 'DAILY_RAIN') {
+                    const nextIndex = Math.min(state.dailyRainCurrentIndex + 1, CONFIG.dailyRainIndices.length - 1);
+                    showFrame(nextIndex);
+                } else {
+                    showFrame(Math.min(state.currentFH + 1, state.totalForecastHours));
+                }
+            });
+            
+            elements.prevBtn.addEventListener('click', () => { 
+                stopAnimation(); 
+                const variable = elements.varSelect.value;
+                
+                if (variable === 'DAILY_RAIN') {
+                    const prevIndex = Math.max(state.dailyRainCurrentIndex - 1, 0);
+                    showFrame(prevIndex);
+                } else {
+                    showFrame(Math.max(state.currentFH - 1, 0));
+                }
+            });
+            
             elements.searchInput.addEventListener('input', (e) => {
                 clearTimeout(state.searchTimeout);
                 state.searchTimeout = setTimeout(() => searchLocation(e.target.value), 500);
             });
+            
             elements.searchBtn.addEventListener('click', () => searchLocation(elements.searchInput.value));
             elements.geoBtn.addEventListener('click', getUserLocation);
-            document.addEventListener('click', (e) => { if (!elements.searchInput.contains(e.target) && !elements.searchResults.contains(e.target)) elements.searchResults.style.display = 'none'; });
-            state.map.on('mousemove', (e) => { const { lat, lng } = e.latlng; updateCoordinateDisplay(lat, lng); updateValueDisplay(lat, lng); });
+            
+            document.addEventListener('click', (e) => { 
+                if (!elements.searchInput.contains(e.target) && !elements.searchResults.contains(e.target)) 
+                    elements.searchResults.style.display = 'none'; 
+            });
+            
+            state.map.on('mousemove', (e) => { 
+                const { lat, lng } = e.latlng; 
+                updateCoordinateDisplay(lat, lng); 
+                updateValueDisplay(lat, lng); 
+            });
+            
             state.map.on('click', async (e) => {
                 const { lat, lng } = e.latlng;
                 state.lastClickPos = e.latlng;
+                
                 const result = getValueAtCoordinates(lat, lng);
+                
                 if (state.markers.clickMarker) state.map.removeLayer(state.markers.clickMarker);
-                state.markers.clickMarker = L.marker([lat, lng], { icon: L.divIcon({ className: 'click-marker', html: '<div style="background: radial-gradient(circle, #0284c7 40%, #0369a1); width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);"></div>', iconSize: [20, 20] }) }).addTo(state.map);
+                
+                state.markers.clickMarker = L.marker([lat, lng], { 
+                    icon: L.divIcon({ 
+                        className: 'click-marker', 
+                        html: '<div style="background: radial-gradient(circle, #0284c7 40%, #0369a1); width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);"></div>', 
+                        iconSize: [20, 20] 
+                    }) 
+                }).addTo(state.map);
+                
                 if (result.value !== null) {
                     const variable = elements.varSelect.value;
                     const varConfig = CONFIG.variables[variable];
                     const formattedValue = result.value.toFixed(varConfig.precision);
-                    state.markers.clickMarker.bindTooltip(`<b>${varConfig.name}:</b> ${formattedValue} ${varConfig.unit}<br><small>Grid [${result.gridIndex.i}, ${result.gridIndex.j}]</small><br><small>Click for timeseries</small>`, { permanent: true, direction: 'top', className: 'value-tooltip' }).openTooltip();
+                    
+                    state.markers.clickMarker.bindTooltip(
+                        `<b>${varConfig.name}:</b> ${formattedValue} ${varConfig.unit}<br>
+                         <small>Grid [${result.gridIndex.i}, ${result.gridIndex.j}]</small><br>
+                         <small>Click for timeseries</small>`, 
+                        { permanent: true, direction: 'top', className: 'value-tooltip' }
+                    ).openTooltip();
                 }
+                
                 updateValueDisplay(lat, lng);
+                
                 if (result.gridIndex && result.value !== null) {
                     const variable = elements.varSelect.value;
                     updateStatus('Opening timeseries chart...', 'info');
@@ -2357,16 +2687,20 @@
                 }
             });
             
-            // Add reset map button listener
             document.getElementById('resetMapBtn').addEventListener('click', resetMapView);
             
             elements.downloadCSVBtn.addEventListener('click', downloadTimeseriesCSV);
             elements.exportChartBtn.addEventListener('click', exportChartAsImage);
             elements.closeChartBtn.addEventListener('click', () => { elements.chartModal.style.display = 'none'; });
             elements.chartModalClose.addEventListener('click', () => { elements.chartModal.style.display = 'none'; });
-            window.addEventListener('click', (e) => { if (e.target === elements.chartModal) elements.chartModal.style.display = 'none'; });
+            
+            window.addEventListener('click', (e) => { 
+                if (e.target === elements.chartModal) elements.chartModal.style.display = 'none'; 
+            });
+            
             document.addEventListener('keydown', (e) => {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+                
                 if (e.key === ' ') { e.preventDefault(); toggleAnimation(); }
                 else if (e.key === 'ArrowRight') elements.nextBtn.click();
                 else if (e.key === 'ArrowLeft') elements.prevBtn.click();
@@ -2374,13 +2708,17 @@
                 else if (e.key === 't' || e.key === 'T') elements.themeToggle.click();
                 else if (e.key === 'g' || e.key === 'G') getUserLocation();
                 else if (e.key === 'Escape') elements.chartModal.style.display = 'none';
-                else if (e.key === 'r' || e.key === 'R') resetMapView(); // Add keyboard shortcut R for reset
+                else if (e.key === 'r' || e.key === 'R') resetMapView();
             });
-            window.addEventListener('resize', () => { if (state.map) setTimeout(() => state.map.invalidateSize(), 100); if (state.chartInstance) state.chartInstance.resize(); });
+            
+            window.addEventListener('resize', () => { 
+                if (state.map) setTimeout(() => state.map.invalidateSize(), 100); 
+                if (state.chartInstance) state.chartInstance.resize(); 
+            });
         }
 
         // ==================== INITIALIZE ====================
-       async function initializeDashboard() {
+        async function initializeDashboard() {
             debug('Starting dashboard initialization...');
             try {
                 initializeMap();
@@ -2389,7 +2727,6 @@
                 setupEventListeners();
                 updatePlayButton();
         
-                // Calculate current forecast hour based on current time
                 const now = new Date();
                 const forecastStart = CONFIG.forecastStart;
                 const hoursSinceStart = Math.floor((now - forecastStart) / (3600 * 1000));
@@ -2401,16 +2738,16 @@
                 debug(`Hours since start: ${hoursSinceStart}`);
                 debug(`Loading spatial plot for current forecast hour: ${currentFH}`);
         
-                // Show the spatial plot for the current time
+                // Set slider to normal mode initially
+                updateSliderForNormalMode();
+                
                 await showFrame(currentFH);
         
                 updateStatus('Click on map to view timeseries', 'success');
                 setTimeout(() => autoDetectLocation(), 1000);
-                // Preload all timeseries for default location immediately
                 setTimeout(() => preloadAllTimeseriesData(), 500);
                 updateCurrentDateTime();
                 
-                // Start real-time monitoring for frame updates
                 startRealTimeMonitoring();
                 
             } catch (error) {

@@ -3,13 +3,13 @@
   "colorbar_min": 0.0,
   "colorbar_max": 1.0,
   "unit": "mm",
-  "percentiles_used": "2-98%",
-  "actual_data_min": -4.457145053038403e-08,
-  "actual_data_max": 28.361783981323242,
-  "colorbar_size": {
-    "width_inches": 24,
-    "height_inches": 2,
-    "tick_fontsize": 16,
-    "title_fontsize": 18
-  }
+  "percentiles_used": "2-99.8%",
+  "actual_data_min": -3.1686635537653274e-08,
+  "actual_data_max": 3.3761415481567383,
+  "ticks": [
+    0,
+    0,
+    1,
+    1
+  ]
 }
