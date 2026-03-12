@@ -1,22 +1,23 @@
 {
   "variable": "T2",
-  "colorbar_min": -16.0,
+  "colorbar_min": -17.0,
   "colorbar_max": 38.0,
   "unit": "\u00b0C",
   "percentiles_used": "2-98%",
-  "actual_data_min": -30.646804809570312,
-  "actual_data_max": 40.628692626953125,
+  "actual_data_min": -30.275588989257812,
+  "actual_data_max": 40.334625244140625,
   "ticks": [
-    -16,
-    -11,
-    -6,
-    -1,
-    4,
-    9,
-    14,
-    19,
-    24,
-    29,
-    34
+    -17,
+    -12,
+    -7,
+    -2,
+    3,
+    8,
+    13,
+    18,
+    23,
+    28,
+    33,
+    38
   ]
 }

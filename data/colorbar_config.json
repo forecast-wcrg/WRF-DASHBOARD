@@ -1,7 +1,7 @@
 {
   "T2": {
     "name": "T2",
-    "colorbar_min": -16.0,
+    "colorbar_min": -17.0,
     "colorbar_max": 38.0,
     "unit": "\u00b0C",
     "cmap": "coolwarm",
@@ -11,7 +11,7 @@
   "RH": {
     "name": "RH",
     "colorbar_min": 7.0,
-    "colorbar_max": 90.0,
+    "colorbar_max": 95.0,
     "unit": "%",
     "cmap": "viridis",
     "display_name": "Rh",
@@ -29,7 +29,7 @@
   "WIND": {
     "name": "WIND",
     "colorbar_min": 0.0,
-    "colorbar_max": 11.0,
+    "colorbar_max": 12.0,
     "unit": "m/s",
     "cmap": "hot_r",
     "display_name": "Wind",
