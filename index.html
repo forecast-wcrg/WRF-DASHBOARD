@@ -644,14 +644,14 @@
             border: 1px solid var(--border-color);
             border-radius: 10px;
             margin-top: 5px;
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
             z-index: 1000;
             display: none;
             box-shadow: 0 4px 15px var(--shadow-color);
         }
         .search-result-item {
-            padding: 10px 14px;
+            padding: 12px 16px;
             cursor: pointer;
             transition: all 0.2s ease;
             border-bottom: 1px solid var(--border-color);
@@ -920,10 +920,36 @@
         .progress-bar { width:60%; height:6px; background:var(--border-color); border-radius:3px; margin-top:15px; overflow:hidden; }
         .progress-fill { height:100%; background:linear-gradient(90deg, var(--accent-color), var(--accent-color-light)); width:0%; transition:width 0.3s ease; border-radius:3px; }
 
+        /* Global preloader bar at map top */
+        .global-preloader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--border-color);
+            z-index: 1000;
+            display: none;
+        }
+        .global-preloader .preloader-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-color-light), var(--accent-color), var(--accent-color-dark));
+            transition: width 0.2s ease;
+            animation: gradientShift 2s ease infinite;
+            background-size: 200% 100%;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideIn { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes valuePulse { 0% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes valuePulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
         .value-update { animation: valuePulse 0.6s ease; }
 
         /* Scrollbar styling */
@@ -1049,6 +1075,11 @@
         </div>
     </header>
 
+    <!-- Global Preloader Bar -->
+    <div id="globalPreloader" class="global-preloader">
+        <div id="preloaderFill" class="preloader-fill"></div>
+    </div>
+
     <!-- New Layout: Left 30% / Right 70% -->
     <div class="main-layout">
         <!-- LEFT COLUMN: Contains all original left panel controls, now scrollable -->
@@ -1059,7 +1090,7 @@
                     <h3><i class="fas fa-search-location"></i> Location</h3>
                     <div class="location-search">
                         <div class="search-container">
-                            <input type="text" id="searchInput" class="search-input" placeholder="Search for a place..." autocomplete="off">
+                            <input type="text" id="searchInput" class="search-input" placeholder="Search for a place (India)..." autocomplete="off">
                             <button id="searchBtn" class="search-btn"><i class="fas fa-search"></i></button>
                             <button id="geoBtn" class="geo-btn" title="Use my location"><i class="fas fa-location-dot"></i></button>
                         </div>
@@ -1240,7 +1271,10 @@
             },
             // Daily rainfall indices: 23, 47, 71, 95, 119, 143, 167, 191, 215, 239, 263, 287, 311, 335, 359
             dailyRainIndices: [23, 47, 71, 95, 119, 143, 167, 191, 215, 239, 263, 287, 311, 335, 359],
-            defaultLocation: { lat: 29.8625, lon: 77.8915278, name: "IIT Roorkee" }
+            defaultLocation: { lat: 29.8625, lon: 77.8915278, name: "IIT Roorkee" },
+            // Parallel batch loading config
+            batchSize: 20,
+            totalForecastHours: 359
         };
 
         // ==================== APPLICATION STATE ====================
@@ -1271,8 +1305,17 @@
             realTimeUpdateTimer: null,
             lastRealTimeCheck: 0,
             // Daily rain specific
-            dailyRainCurrentIndex: 0, // Index in dailyRainIndices array
-            isDailyRainMode: false
+            dailyRainCurrentIndex: 0,
+            isDailyRainMode: false,
+            // Preloader state
+            preloadProgress: 0,
+            preloadTotal: 0,
+            preloadCompleted: 0,
+            preloadStarted: false,
+            // Location search cache
+            searchCache: new Map(),
+            lastSearchQuery: '',
+            searchAbortController: null
         };
 
         // ==================== UI ELEMENTS ====================
@@ -1325,7 +1368,10 @@
             badgeLocation: document.getElementById("badgeLocation"),
             hourlyForecast: document.getElementById("hourlyForecast"),
             forecastVariableBadge: document.getElementById("forecastVariableBadge"),
-            currentDateTime: document.getElementById("currentDateTime")
+            currentDateTime: document.getElementById("currentDateTime"),
+            // Preloader elements
+            globalPreloader: document.getElementById("globalPreloader"),
+            preloaderFill: document.getElementById("preloaderFill")
         };
 
         // Set current year in footer
@@ -1359,24 +1405,17 @@
 
         // ==================== DAILY RAIN HELPER FUNCTIONS ====================
         function getDailyRainIndexFromFH(fh) {
-            // Find the closest daily index that's <= fh
             for (let i = CONFIG.dailyRainIndices.length - 1; i >= 0; i--) {
-                if (CONFIG.dailyRainIndices[i] <= fh) {
-                    return i;
-                }
+                if (CONFIG.dailyRainIndices[i] <= fh) return i;
             }
             return 0;
         }
 
         function getFHFromDailyIndex(index) {
-            if (index >= 0 && index < CONFIG.dailyRainIndices.length) {
-                return CONFIG.dailyRainIndices[index];
-            }
-            return 0;
+            return (index >= 0 && index < CONFIG.dailyRainIndices.length) ? CONFIG.dailyRainIndices[index] : 0;
         }
 
         function updateSliderForDailyRain() {
-            // When in daily rain mode, slider should have 15 steps (0-14) representing the 15 daily frames
             elements.slider.min = 0;
             elements.slider.max = CONFIG.dailyRainIndices.length - 1;
             elements.slider.step = 1;
@@ -1472,9 +1511,7 @@
             const hoursSinceStart = Math.floor((now - forecastStart) / (3600 * 1000));
             const currentFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
             
-            if (state.isPlaying) {
-                stopAnimation();
-            }
+            if (state.isPlaying) stopAnimation();
             
             showFrame(currentFH);
             state.map.setView([29.5, 79.5], 7);
@@ -1512,9 +1549,7 @@
         async function loadGridData(fh) {
             const variable = elements.varSelect.value;
             
-            // Handle daily rain special case
             if (variable === 'DAILY_RAIN') {
-                // Convert slider index to actual FH
                 const actualFH = getFHFromDailyIndex(fh);
                 const cacheKey = `${variable}_${actualFH}`;
                 
@@ -1541,7 +1576,6 @@
                     return false;
                 }
             } else {
-                // Normal variable
                 const cacheKey = `${variable}_${fh}`;
                 if (state.allGrids[cacheKey]) { 
                     state.currentGrid = state.allGrids[cacheKey]; 
@@ -1586,7 +1620,6 @@
         async function updateMapLayer(fh) {
             const variable = elements.varSelect.value;
             
-            // Handle daily rain special case
             let actualFH = fh;
             if (variable === 'DAILY_RAIN') {
                 actualFH = getFHFromDailyIndex(fh);
@@ -1721,7 +1754,6 @@
             }
         }
 
-        // Start real-time monitoring
         function startRealTimeMonitoring() {
             state.realTimeUpdateTimer = setInterval(() => {
                 checkAndUpdateRealTime();
@@ -1752,12 +1784,11 @@
             const variable = elements.varSelect.value;
             
             if (variable === 'DAILY_RAIN') {
-                // Daily rain has 15 frames
                 state.timer = setInterval(() => {
                     let nextIndex = (state.dailyRainCurrentIndex < CONFIG.dailyRainIndices.length - 1) ? 
                                     state.dailyRainCurrentIndex + 1 : 0;
                     showFrame(nextIndex);
-                }, CONFIG.baseFrameTime / state.currentSpeed * 2); // Slightly slower for daily
+                }, CONFIG.baseFrameTime / state.currentSpeed * 2);
             } else {
                 state.timer = setInterval(() => {
                     let nextFH = (state.currentFH < state.totalForecastHours) ? state.currentFH + 1 : 0;
@@ -1780,12 +1811,248 @@
             return 359;
         }
 
+        // ==================== FAST LOCATION SEARCH (Improved) ====================
+        async function searchLocation(query) {
+            if (!query || query.length < 2) { 
+                elements.searchResults.style.display = 'none'; 
+                return; 
+            }
+
+            // Cancel previous request if any
+            if (state.searchAbortController) {
+                state.searchAbortController.abort();
+            }
+            
+            state.searchAbortController = new AbortController();
+            
+            // Check cache first for faster response
+            const cacheKey = query.toLowerCase().trim();
+            if (state.searchCache.has(cacheKey)) {
+                debug('Using cached search results', cacheKey);
+                displaySearchResults(state.searchCache.get(cacheKey), query);
+                return;
+            }
+
+            try {
+                // Use more focused search with India bias for faster results
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=in&limit=15&addressdetails=1&dedupe=1`,
+                    { 
+                        signal: state.searchAbortController.signal,
+                        headers: { 'Accept-Language': 'en' }
+                    }
+                );
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const results = await response.json();
+                
+                // Cache results
+                state.searchCache.set(cacheKey, results);
+                // Limit cache size
+                if (state.searchCache.size > 50) {
+                    const firstKey = state.searchCache.keys().next().value;
+                    state.searchCache.delete(firstKey);
+                }
+                
+                displaySearchResults(results, query);
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    debug('Search aborted');
+                } else {
+                    debug('Search error:', error);
+                    elements.searchResults.style.display = 'none';
+                }
+            }
+        }
+
+        function displaySearchResults(results, query) {
+            if (!results || results.length === 0) {
+                elements.searchResults.style.display = 'none';
+                return;
+            }
+
+            elements.searchResults.innerHTML = '';
+            
+            results.forEach(result => {
+                const lat = parseFloat(result.lat);
+                const lon = parseFloat(result.lon);
+                const insideDomain = isInWRFDomain(lat, lon);
+                
+                const item = document.createElement('div');
+                item.className = `search-result-item ${!insideDomain ? 'outside-domain' : ''}`;
+                
+                // Get better display name
+                const displayName = result.display_name.split(',').slice(0,2).join(',');
+                const stateMatch = result.display_name.match(/(Uttarakhand|Uttar Pradesh|Himachal Pradesh|Haryana|Delhi|Punjab|Jammu and Kashmir|Ladakh|Rajasthan|Madhya Pradesh)/i);
+                const stateName = stateMatch ? stateMatch[0] : '';
+                
+                item.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <i class="fas fa-map-pin"></i> <strong>${result.display_name.split(',')[0]}</strong><br>
+                            <small>${stateName ? stateName + ' · ' : ''}${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E</small>
+                        </div>
+                        <span class="domain-badge ${insideDomain ? 'inside' : 'outside'}">
+                            ${insideDomain ? '✓ In Domain' : '✗ Outside'}
+                        </span>
+                    </div>
+                `;
+                
+                item.addEventListener('click', () => {
+                    goToLocation(lat, lon, result.display_name.split(',')[0], true);
+                    elements.searchResults.style.display = 'none';
+                    elements.searchInput.value = result.display_name.split(',')[0];
+                });
+                
+                elements.searchResults.appendChild(item);
+            });
+            
+            elements.searchResults.style.display = 'block';
+        }
+
+        // ==================== PARALLEL PRELOADING OF ALL JSON FILES ====================
+        async function preloadAllJSONFiles() {
+            if (state.preloadStarted) return;
+            state.preloadStarted = true;
+            
+            debug('Starting parallel preloading of all JSON files...');
+            elements.globalPreloader.style.display = 'block';
+            
+            const variables = ['T2', 'RH', 'WIND', 'RAIN', 'DAILY_RAIN'];
+            const allFiles = [];
+            
+            // Build list of all files to preload
+            variables.forEach(variable => {
+                if (variable === 'DAILY_RAIN') {
+                    CONFIG.dailyRainIndices.forEach(fh => {
+                        allFiles.push({ variable, fh, key: `${variable}_${fh}` });
+                    });
+                } else {
+                    for (let fh = 0; fh <= CONFIG.totalForecastHours; fh++) {
+                        allFiles.push({ variable, fh, key: `${variable}_${fh}` });
+                    }
+                }
+            });
+            
+            state.preloadTotal = allFiles.length;
+            state.preloadCompleted = 0;
+            
+            debug(`Total files to preload: ${state.preloadTotal}`);
+            
+            // Process in batches of CONFIG.batchSize
+            for (let i = 0; i < allFiles.length; i += CONFIG.batchSize) {
+                const batch = allFiles.slice(i, i + CONFIG.batchSize);
+                
+                // Load batch in parallel
+                await Promise.all(batch.map(async (file) => {
+                    try {
+                        if (state.allGrids[file.key]) {
+                            state.preloadCompleted++;
+                            updatePreloaderProgress();
+                            return;
+                        }
+                        
+                        const paddedFH = file.fh.toString().padStart(3, '0');
+                        const response = await fetch(`data_json/${file.variable}/${file.variable}_${paddedFH}.json`);
+                        
+                        if (response.ok) {
+                            const gridData = await response.json();
+                            if (gridData && gridData.values) {
+                                state.allGrids[file.key] = gridData;
+                            }
+                        }
+                    } catch (error) {
+                        debug(`Failed to preload ${file.variable}_${file.fh}: ${error.message}`);
+                    } finally {
+                        state.preloadCompleted++;
+                        updatePreloaderProgress();
+                    }
+                }));
+                
+                // Small delay between batches to avoid overwhelming the network
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            
+            debug('Preloading complete!');
+            elements.globalPreloader.style.display = 'none';
+            updateStatus('All data preloaded - instant timeseries ready!', 'success');
+        }
+
+        function updatePreloaderProgress() {
+            const progress = (state.preloadCompleted / state.preloadTotal) * 100;
+            elements.preloaderFill.style.width = `${progress}%`;
+        }
+
+        // ==================== INSTANT TIMESERIES (CACHE-FIRST) ====================
+        async function getTimeseriesDataInstant(lat, lon, variable, gridI, gridJ) {
+            const cacheKey = `${lat.toFixed(4)}_${lon.toFixed(4)}_${variable}`;
+            
+            // Return cached data if available
+            if (state.allTimeseriesData[cacheKey]) {
+                debug('Timeseries cache hit', cacheKey);
+                return state.allTimeseriesData[cacheKey];
+            }
+            
+            debug('Building timeseries from preloaded grids...');
+            
+            const timeseriesValues = [];
+            const hours = [];
+            const timestamps = [];
+            
+            if (variable === 'DAILY_RAIN') {
+                for (let idx = 0; idx < CONFIG.dailyRainIndices.length; idx++) {
+                    const fh = CONFIG.dailyRainIndices[idx];
+                    const gridCacheKey = `${variable}_${fh}`;
+                    const gridData = state.allGrids[gridCacheKey];
+                    
+                    if (gridData && gridData.values && 
+                        gridI < gridData.values.length && 
+                        gridJ < gridData.values[0].length) {
+                        const value = gridData.values[gridI][gridJ];
+                        if (value !== null && !isNaN(value)) {
+                            timeseriesValues.push(value);
+                            hours.push(fh);
+                            timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
+                        }
+                    }
+                }
+            } else {
+                for (let fh = 0; fh <= CONFIG.totalForecastHours; fh++) {
+                    const gridCacheKey = `${variable}_${fh}`;
+                    const gridData = state.allGrids[gridCacheKey];
+                    
+                    if (gridData && gridData.values && 
+                        gridI < gridData.values.length && 
+                        gridJ < gridData.values[0].length) {
+                        const value = gridData.values[gridI][gridJ];
+                        if (value !== null && !isNaN(value)) {
+                            timeseriesValues.push(value);
+                            hours.push(fh);
+                            timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
+                        }
+                    }
+                }
+            }
+            
+            const timeseriesData = { 
+                lat, lon, gridI, gridJ, variable, 
+                values: timeseriesValues, 
+                hours, 
+                timestamps 
+            };
+            
+            state.allTimeseriesData[cacheKey] = timeseriesData;
+            return timeseriesData;
+        }
+
         // ==================== LOCATION & SEARCH ====================
+        // ==================== GO TO LOCATION ====================
         function goToLocation(lat, lon, name, shouldZoom = false) {
             if (!isInWRFDomain(lat, lon)) {
                 updateStatus('Location outside WRF domain - cannot show forecast', 'warn');
                 if (shouldZoom) state.map.setView([lat, lon], 7);
                 else state.map.panTo([lat, lon]);
+                
                 if (state.markers.locationMarker) state.map.removeLayer(state.markers.locationMarker);
                 state.markers.locationMarker = L.marker([lat, lon], { 
                     icon: L.divIcon({ 
@@ -1794,6 +2061,7 @@
                         iconSize: [24, 24] 
                     }) 
                 }).addTo(state.map);
+                
                 elements.currentConditions.style.display = 'none';
                 elements.locationBadge.style.display = 'flex';
                 elements.badgeLocation.textContent = name + ' (outside domain)';
@@ -1802,13 +2070,27 @@
             
             if (shouldZoom) state.map.setView([lat, lon], 7);
             else state.map.panTo([lat, lon]);
+            
             if (state.markers.locationMarker) state.map.removeLayer(state.markers.locationMarker);
-            state.markers.locationMarker = L.marker([lat, lon], { icon: L.divIcon({ className: 'location-marker', html: '<div style="background: radial-gradient(circle, #059669 40%, #047857); width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);"></div>', iconSize: [24, 24] }) }).addTo(state.map);
+            
+            state.markers.locationMarker = L.marker([lat, lon], { 
+                icon: L.divIcon({ 
+                    className: 'location-marker', 
+                    html: '<div style="background: radial-gradient(circle, #059669 40%, #047857); width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);"></div>', 
+                    iconSize: [24, 24] 
+                }) 
+            }).addTo(state.map);
+            
             state.currentLocation = { lat, lon };
             state.locationName = name;
+            
             elements.locationBadge.style.display = 'flex';
             elements.badgeLocation.textContent = name;
+            
+            // Force update of all current conditions
             updateCurrentConditions(lat, lon);
+            
+            // Also update hourly forecast for current variable
             loadHourlyForecast(lat, lon);
         }
 
@@ -1819,7 +2101,7 @@
                 async (position) => {
                     const { latitude, longitude } = position.coords;
                     try {
-                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`);
                         const data = await response.json();
                         const name = data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || 'Current Location';
                         goToLocation(latitude, longitude, name, true);
@@ -1843,7 +2125,7 @@
                     const { latitude, longitude } = position.coords;
                     if (isInWRFDomain(latitude, longitude)) {
                         try {
-                            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`);
                             const data = await response.json();
                             const name = data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || 'Your Location';
                             goToLocation(latitude, longitude, name, false);
@@ -1860,71 +2142,6 @@
                     elements.geoBtn.innerHTML = '<i class="fas fa-location-dot"></i>';
                 }
             );
-        }
-
-        // ==================== SEARCH ====================
-        async function searchLocation(query) {
-            if (!query || query.length < 3) { 
-                elements.searchResults.style.display = 'none'; 
-                return; 
-            }
-            try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, India&limit=10&addressdetails=1`);
-                const results = await response.json();
-                
-                if (results.length > 0) {
-                    elements.searchResults.innerHTML = '';
-                    
-                    results.forEach(result => {
-                        const lat = parseFloat(result.lat);
-                        const lon = parseFloat(result.lon);
-                        const insideDomain = isInWRFDomain(lat, lon);
-                        
-                        const item = document.createElement('div');
-                        item.className = `search-result-item ${!insideDomain ? 'outside-domain' : ''}`;
-                        
-                        const displayName = result.display_name.split(',').slice(0,3).join(',');
-                        const stateMatch = result.display_name.match(/(Uttarakhand|Uttar Pradesh|Himachal Pradesh|Haryana|Delhi|Punjab)/i);
-                        const stateName = stateMatch ? stateMatch[0] : 'Other';
-                        
-                        item.innerHTML = `
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <i class="fas fa-map-pin"></i> <strong>${result.display_name.split(',')[0]}</strong><br>
-                                    <small>${stateName} · ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E</small>
-                                </div>
-                                <span class="domain-badge ${insideDomain ? 'inside' : 'outside'}">
-                                    ${insideDomain ? '✓ In Domain' : '✗ Outside'}
-                                </span>
-                            </div>
-                        `;
-                        
-                        if (insideDomain) {
-                            item.addEventListener('click', () => {
-                                goToLocation(lat, lon, result.display_name.split(',')[0], true);
-                                elements.searchResults.style.display = 'none';
-                                elements.searchInput.value = result.display_name.split(',')[0];
-                            });
-                        } else {
-                            item.addEventListener('click', () => {
-                                updateStatus('Selected location is outside WRF domain - cannot show forecast', 'warn');
-                                goToLocation(lat, lon, result.display_name.split(',')[0], true);
-                                elements.searchResults.style.display = 'none';
-                                elements.searchInput.value = result.display_name.split(',')[0];
-                            });
-                        }
-                        
-                        elements.searchResults.appendChild(item);
-                    });
-                    
-                    elements.searchResults.style.display = 'block';
-                } else {
-                    elements.searchResults.style.display = 'none';
-                }
-            } catch (error) { 
-                debug('Search error:', error);
-                elements.searchResults.style.display = 'none';
-            }
         }
 
         // ==================== CURRENT CONDITIONS ====================
@@ -1950,36 +2167,101 @@
             }) + ' IST';
             
             const gridIndex = latLonToGridIndex(lat, lon);
-            if (!gridIndex) return;
+            if (!gridIndex) {
+                console.warn('Could not find grid index for location');
+                return;
+            }
+            
+            // Set default values
+            elements.currentTemp.innerHTML = '--°C <small>now</small>';
+            elements.currentHumidity.innerHTML = '--% <small>now</small>';
+            elements.currentWind.innerHTML = '-- m/s <small>now</small>';
+            elements.currentRain.innerHTML = '-- mm <small>now</small>';
             
             const variables = ['T2', 'RH', 'WIND', 'RAIN'];
+            
             for (const varName of variables) {
                 const cacheKey = `${varName}_${currentFH}`;
-                if (!state.allGrids[cacheKey]) {
+                
+                // Check if we have the grid data in cache
+                if (state.allGrids[cacheKey] && state.allGrids[cacheKey].values) {
+                    const gridData = state.allGrids[cacheKey];
+                    
+                    // Validate grid indices
+                    if (gridData.values && 
+                        gridIndex.i < gridData.values.length && 
+                        gridIndex.j < gridData.values[0].length) {
+                        
+                        const value = gridData.values[gridIndex.i][gridIndex.j];
+                        const varConfig = CONFIG.variables[varName];
+                        
+                        if (value !== null && !isNaN(value)) {
+                            const formatted = value.toFixed(varConfig.precision);
+                            
+                            if (varName === 'T2') {
+                                elements.currentTemp.innerHTML = `${formatted}°C <small>now</small>`;
+                            } else if (varName === 'RH') {
+                                elements.currentHumidity.innerHTML = `${formatted}% <small>now</small>`;
+                            } else if (varName === 'WIND') {
+                                elements.currentWind.innerHTML = `${formatted} m/s <small>now</small>`;
+                            } else if (varName === 'RAIN') {
+                                elements.currentRain.innerHTML = `${formatted} mm <small>now</small>`;
+                            }
+                        }
+                    }
+                } else {
+                    // If not in cache, try to load it
                     try {
                         const paddedFH = currentFH.toString().padStart(3, '0');
                         const response = await fetch(`data_json/${varName}/${varName}_${paddedFH}.json`);
+                        
                         if (response.ok) {
                             const gridData = await response.json();
                             state.allGrids[cacheKey] = gridData;
+                            
+                            if (gridData.values && 
+                                gridIndex.i < gridData.values.length && 
+                                gridIndex.j < gridData.values[0].length) {
+                                
+                                const value = gridData.values[gridIndex.i][gridIndex.j];
+                                const varConfig = CONFIG.variables[varName];
+                                
+                                if (value !== null && !isNaN(value)) {
+                                    const formatted = value.toFixed(varConfig.precision);
+                                    
+                                    if (varName === 'T2') {
+                                        elements.currentTemp.innerHTML = `${formatted}°C <small>now</small>`;
+                                    } else if (varName === 'RH') {
+                                        elements.currentHumidity.innerHTML = `${formatted}% <small>now</small>`;
+                                    } else if (varName === 'WIND') {
+                                        elements.currentWind.innerHTML = `${formatted} m/s <small>now</small>`;
+                                    } else if (varName === 'RAIN') {
+                                        elements.currentRain.innerHTML = `${formatted} mm <small>now</small>`;
+                                    }
+                                }
+                            }
                         }
-                    } catch (error) { continue; }
-                }
-                if (state.allGrids[cacheKey] && state.allGrids[cacheKey].values) {
-                    const gridData = state.allGrids[cacheKey];
-                    if (gridData.values[gridIndex.i] && gridData.values[gridIndex.i][gridIndex.j] !== undefined) {
-                        const value = gridData.values[gridIndex.i][gridIndex.j];
-                        const varConfig = CONFIG.variables[varName];
-                        const formatted = value !== null && !isNaN(value) ? value.toFixed(varConfig.precision) : '--';
-                        if (varName === 'T2') elements.currentTemp.innerHTML = `${formatted}°C <small>now</small>`;
-                        else if (varName === 'RH') elements.currentHumidity.innerHTML = `${formatted}% <small>now</small>`;
-                        else if (varName === 'WIND') elements.currentWind.innerHTML = `${formatted} m/s <small>now</small>`;
-                        else if (varName === 'RAIN') elements.currentRain.innerHTML = `${formatted} mm <small>now</small>`;
+                    } catch (error) {
+                        debug(`Failed to load ${varName} for current conditions: ${error.message}`);
                     }
                 }
             }
+            
+            // Update the values with animation
+            elements.currentTemp.classList.add('value-update');
+            elements.currentHumidity.classList.add('value-update');
+            elements.currentWind.classList.add('value-update');
+            elements.currentRain.classList.add('value-update');
+            
+            setTimeout(() => {
+                elements.currentTemp.classList.remove('value-update');
+                elements.currentHumidity.classList.remove('value-update');
+                elements.currentWind.classList.remove('value-update');
+                elements.currentRain.classList.remove('value-update');
+            }, 600);
         }
 
+        // ==================== HOURLY FORECAST ====================
         async function loadHourlyForecast(lat, lon) {
             if (!isInWRFDomain(lat, lon)) {
                 elements.hourlyForecast.innerHTML = '<div class="forecast-error">No forecast data (outside domain)</div>';
@@ -1987,13 +2269,15 @@
             }
             
             const gridIndex = latLonToGridIndex(lat, lon);
-            if (!gridIndex) return;
+            if (!gridIndex) {
+                elements.hourlyForecast.innerHTML = '<div class="forecast-error">Could not locate grid cell</div>';
+                return;
+            }
             
             const variable = elements.varSelect.value;
             const varConfig = CONFIG.variables[variable];
             
             elements.forecastVariableBadge.textContent = varConfig.name;
-            
             elements.hourlyForecast.innerHTML = `<div class="forecast-loading"><div class="loading-spinner-small"></div><span>Loading hourly ${varConfig.name} forecast...</span></div>`;
             
             const now = new Date();
@@ -2003,24 +2287,34 @@
             const forecastData = [];
             
             if (variable === 'DAILY_RAIN') {
-                // For daily rain, show next 15 days (all available daily frames)
+                // For daily rain, show next 15 days
                 for (let i = 0; i < CONFIG.dailyRainIndices.length; i++) {
                     const fh = CONFIG.dailyRainIndices[i];
                     const cacheKey = `${variable}_${fh}`;
-                    if (!state.allGrids[cacheKey]) {
+                    
+                    // Try to get from cache first
+                    let gridData = state.allGrids[cacheKey];
+                    
+                    // If not in cache, try to load it
+                    if (!gridData) {
                         try {
                             const paddedFH = fh.toString().padStart(3, '0');
                             const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
                             if (response.ok) {
-                                const gridData = await response.json();
+                                gridData = await response.json();
                                 state.allGrids[cacheKey] = gridData;
                             }
-                        } catch (error) { continue; }
+                        } catch (error) {
+                            continue;
+                        }
                     }
-                    if (state.allGrids[cacheKey] && state.allGrids[cacheKey].values) {
-                        const gridData = state.allGrids[cacheKey];
-                        if (gridData.values[gridIndex.i] && gridData.values[gridIndex.i][gridIndex.j] !== undefined) {
-                            const value = gridData.values[gridIndex.i][gridIndex.j];
+                    
+                    if (gridData && gridData.values && 
+                        gridIndex.i < gridData.values.length && 
+                        gridIndex.j < gridData.values[0].length) {
+                        
+                        const value = gridData.values[gridIndex.i][gridIndex.j];
+                        if (value !== null && !isNaN(value)) {
                             const forecastTime = new Date(forecastStart.getTime() + fh * 3600 * 1000);
                             forecastData.push({ 
                                 hour: i, 
@@ -2033,25 +2327,36 @@
                     }
                 }
             } else {
-                // Normal hourly forecast
+                // Normal hourly forecast - show next 24 hours
                 for (let hour = 0; hour < 24; hour++) {
                     const fh = startFH + hour;
                     if (fh > state.totalForecastHours) break;
+                    
                     const cacheKey = `${variable}_${fh}`;
-                    if (!state.allGrids[cacheKey]) {
+                    
+                    // Try to get from cache first
+                    let gridData = state.allGrids[cacheKey];
+                    
+                    // If not in cache, try to load it
+                    if (!gridData) {
                         try {
                             const paddedFH = fh.toString().padStart(3, '0');
                             const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
                             if (response.ok) {
-                                const gridData = await response.json();
+                                gridData = await response.json();
                                 state.allGrids[cacheKey] = gridData;
                             }
-                        } catch (error) { continue; }
+                        } catch (error) {
+                            continue;
+                        }
                     }
-                    if (state.allGrids[cacheKey] && state.allGrids[cacheKey].values) {
-                        const gridData = state.allGrids[cacheKey];
-                        if (gridData.values[gridIndex.i] && gridData.values[gridIndex.i][gridIndex.j] !== undefined) {
-                            const value = gridData.values[gridIndex.i][gridIndex.j];
+                    
+                    if (gridData && gridData.values && 
+                        gridIndex.i < gridData.values.length && 
+                        gridIndex.j < gridData.values[0].length) {
+                        
+                        const value = gridData.values[gridIndex.i][gridIndex.j];
+                        if (value !== null && !isNaN(value)) {
                             const forecastTime = new Date(forecastStart.getTime() + fh * 3600 * 1000);
                             forecastData.push({ 
                                 hour: hour, 
@@ -2066,7 +2371,12 @@
             }
             
             state.hourlyForecastData[`${lat.toFixed(4)}_${lon.toFixed(4)}_${variable}`] = forecastData;
-            renderHourlyForecast(forecastData, variable);
+            
+            if (forecastData.length === 0) {
+                elements.hourlyForecast.innerHTML = '<div class="forecast-error">No forecast data available for this location</div>';
+            } else {
+                renderHourlyForecast(forecastData, variable);
+            }
         }
 
         function renderHourlyForecast(forecastData, variable) {
@@ -2109,191 +2419,29 @@
             elements.hourlyForecast.innerHTML = html;
         }
 
-        // ==================== PRELOAD ALL TIMESERIES ====================
-        async function preloadAllTimeseriesData() {
-            debug('Preloading all timeseries data for default location...');
-            const lat = CONFIG.defaultLocation.lat;
-            const lon = CONFIG.defaultLocation.lon;
-            const gridIndex = latLonToGridIndex(lat, lon);
-            if (!gridIndex) return;
-            const variables = ['T2', 'RH', 'WIND', 'RAIN', 'DAILY_RAIN'];
-            
-            for (const variable of variables) {
-                const cacheKey = `${lat.toFixed(4)}_${lon.toFixed(4)}_${variable}`;
-                if (state.allTimeseriesData[cacheKey]) continue;
-                
-                const timeseriesValues = [], hours = [], timestamps = [];
-                
-                if (variable === 'DAILY_RAIN') {
-                    // Daily rain has 15 frames
-                    for (let idx = 0; idx < CONFIG.dailyRainIndices.length; idx++) {
-                        const fh = CONFIG.dailyRainIndices[idx];
-                        const gridCacheKey = `${variable}_${fh}`;
-                        if (!state.allGrids[gridCacheKey]) {
-                            try {
-                                const paddedFH = fh.toString().padStart(3, '0');
-                                const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
-                                if (response.ok) {
-                                    const gridData = await response.json();
-                                    state.allGrids[gridCacheKey] = gridData;
-                                }
-                            } catch (error) { continue; }
-                        }
-                        const gridData = state.allGrids[gridCacheKey];
-                        if (gridData && gridData.values && gridIndex.i < gridData.values.length && gridIndex.j < gridData.values[0].length) {
-                            const value = gridData.values[gridIndex.i][gridIndex.j];
-                            if (value !== null && !isNaN(value)) {
-                                timeseriesValues.push(value);
-                                hours.push(fh);
-                                timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
-                            }
-                        }
-                    }
-                } else {
-                    // Normal hourly data
-                    for (let fh = 0; fh <= state.totalForecastHours; fh++) {
-                        const gridCacheKey = `${variable}_${fh}`;
-                        if (!state.allGrids[gridCacheKey]) {
-                            try {
-                                const paddedFH = fh.toString().padStart(3, '0');
-                                const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
-                                if (response.ok) {
-                                    const gridData = await response.json();
-                                    state.allGrids[gridCacheKey] = gridData;
-                                }
-                            } catch (error) { continue; }
-                        }
-                        const gridData = state.allGrids[gridCacheKey];
-                        if (gridData && gridData.values && gridIndex.i < gridData.values.length && gridIndex.j < gridData.values[0].length) {
-                            const value = gridData.values[gridIndex.i][gridIndex.j];
-                            if (value !== null && !isNaN(value)) {
-                                timeseriesValues.push(value);
-                                hours.push(fh);
-                                timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
-                            }
-                        }
-                        if (fh % 50 === 0) await new Promise(resolve => setTimeout(resolve, 1));
-                    }
-                }
-                
-                state.allTimeseriesData[cacheKey] = { lat, lon, gridI: gridIndex.i, gridJ: gridIndex.j, variable, values: timeseriesValues, hours, timestamps };
-                debug(`Preloaded ${variable} timeseries (${timeseriesValues.length} points)`);
-            }
-            state.defaultLocationPreloaded = true;
-            updateStatus('All timeseries preloaded', 'success');
-        }
-
-        // ==================== TIMESERIES CHART ====================
-        async function fetchTimeseriesData(lat, lon, variable, gridI, gridJ) {
-            const cacheKey = `${lat.toFixed(4)}_${lon.toFixed(4)}_${variable}`;
-            
-            if (state.allTimeseriesData[cacheKey]) {
-                state.timeseriesData = state.allTimeseriesData[cacheKey];
-                return true;
-            }
-
-            state.isLoadingTimeseries = true;
-            elements.chartLoading.style.display = 'flex';
-            elements.progressFill.style.width = '0%';
-            
-            try {
-                updateStatus(`Loading timeseries data for ${variable}...`, 'info');
-                const timeseriesValues = [], hours = [], timestamps = [];
-                
-                if (variable === 'DAILY_RAIN') {
-                    const totalDays = CONFIG.dailyRainIndices.length;
-                    for (let idx = 0; idx < totalDays; idx++) {
-                        const fh = CONFIG.dailyRainIndices[idx];
-                        elements.progressFill.style.width = `${Math.round((idx / totalDays) * 100)}%`;
-                        elements.loadingText.textContent = `Loading day ${idx+1}/${totalDays}...`;
-                        
-                        if (idx % 5 === 0) await new Promise(resolve => setTimeout(resolve, 1));
-                        
-                        const cacheKeyGrid = `${variable}_${fh}`;
-                        if (!state.allGrids[cacheKeyGrid]) {
-                            try {
-                                const paddedFH = fh.toString().padStart(3, '0');
-                                const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
-                                if (response.ok) {
-                                    const gridData = await response.json();
-                                    state.allGrids[cacheKeyGrid] = gridData;
-                                }
-                            } catch (error) { continue; }
-                        }
-                        
-                        const gridData = state.allGrids[cacheKeyGrid];
-                        if (gridData && gridData.values && gridI < gridData.values.length && gridJ < gridData.values[0].length) {
-                            const value = gridData.values[gridI][gridJ];
-                            if (value !== null && !isNaN(value)) {
-                                timeseriesValues.push(value);
-                                hours.push(fh);
-                                timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
-                            }
-                        }
-                    }
-                } else {
-                    const totalHours = state.totalForecastHours;
-                    for (let fh = 0; fh <= totalHours; fh++) {
-                        elements.progressFill.style.width = `${Math.round((fh / totalHours) * 100)}%`;
-                        elements.loadingText.textContent = `Loading hour ${fh}/${totalHours}...`;
-                        
-                        if (fh % 20 === 0) await new Promise(resolve => setTimeout(resolve, 1));
-                        
-                        const cacheKeyGrid = `${variable}_${fh}`;
-                        if (!state.allGrids[cacheKeyGrid]) {
-                            try {
-                                const paddedFH = fh.toString().padStart(3, '0');
-                                const response = await fetch(`data_json/${variable}/${variable}_${paddedFH}.json`);
-                                if (response.ok) {
-                                    const gridData = await response.json();
-                                    state.allGrids[cacheKeyGrid] = gridData;
-                                }
-                            } catch (error) { continue; }
-                        }
-                        
-                        const gridData = state.allGrids[cacheKeyGrid];
-                        if (gridData && gridData.values && gridI < gridData.values.length && gridJ < gridData.values[0].length) {
-                            const value = gridData.values[gridI][gridJ];
-                            if (value !== null && !isNaN(value)) {
-                                timeseriesValues.push(value);
-                                hours.push(fh);
-                                timestamps.push(new Date(CONFIG.forecastStart.getTime() + fh * 3600 * 1000));
-                            }
-                        }
-                    }
-                }
-                
-                state.timeseriesData = { lat, lon, gridI, gridJ, variable, values: timeseriesValues, hours, timestamps };
-                state.allTimeseriesData[cacheKey] = state.timeseriesData;
-                updateStatus(`Timeseries data loaded (${timeseriesValues.length} points)`, 'success');
-                return true;
-            } catch (error) {
-                debug(`Failed to load timeseries: ${error.message}`, error);
-                updateStatus(`Error loading timeseries`, 'error');
-                return false;
-            } finally {
-                elements.chartLoading.style.display = 'none';
-                state.isLoadingTimeseries = false;
-            }
-        }
-
+        // ==================== INSTANT TIMESERIES CHART ====================
         async function showTimeseriesChart(lat, lon, variable, gridI, gridJ) {
             elements.chartModal.style.display = 'block';
             elements.chartTitle.textContent = `${CONFIG.variables[variable].name} Timeseries`;
             elements.chartSubtitle.textContent = `📍 ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E | Grid [${gridI}, ${gridJ}]`;
             
-            if (state.chartInstance) { state.chartInstance.destroy(); state.chartInstance = null; }
+            if (state.chartInstance) { 
+                state.chartInstance.destroy(); 
+                state.chartInstance = null; 
+            }
             
-            elements.chartStats.innerHTML = `<div class="stat-item"><div class="stat-label"><i class="fas fa-spinner fa-spin"></i> Loading Data</div><div class="stat-value">Please wait...</div><div class="stat-subvalue">Loading forecast data</div></div>`;
+            elements.chartStats.innerHTML = `<div class="stat-item"><div class="stat-label"><i class="fas fa-spinner fa-spin"></i> Loading Data</div><div class="stat-value">Please wait...</div><div class="stat-subvalue">Building timeseries from cache</div></div>`;
             elements.downloadCSVBtn.disabled = true;
             elements.exportChartBtn.disabled = true;
             
-            const success = await fetchTimeseriesData(lat, lon, variable, gridI, gridJ);
+            // Get data instantly from cache
+            const timeseriesData = await getTimeseriesDataInstant(lat, lon, variable, gridI, gridJ);
+            state.timeseriesData = timeseriesData;
             
             elements.downloadCSVBtn.disabled = false;
             elements.exportChartBtn.disabled = false;
             
-            if (!success || state.timeseriesData.values.length === 0) {
+            if (!timeseriesData || timeseriesData.values.length === 0) {
                 elements.chartSubtitle.textContent = `No data available at (${lat.toFixed(4)}°, ${lon.toFixed(4)}°)`;
                 elements.chartStats.innerHTML = `<div class="stat-item"><div class="stat-label"><i class="fas fa-exclamation-triangle"></i> No Data Available</div><div class="stat-value">--</div><div class="stat-subvalue">Could not load timeseries data</div></div>`;
                 return;
@@ -2579,23 +2727,17 @@
             
             elements.varSelect.addEventListener('change', () => { 
                 stopAnimation(); 
-                state.allGrids = {}; 
                 
                 const variable = elements.varSelect.value;
                 
                 if (variable === 'DAILY_RAIN') {
-                    // Switch to daily rain mode
                     state.isDailyRainMode = true;
                     state.dailyRainCurrentIndex = getDailyRainIndexFromFH(state.currentFH);
                     updateSliderForDailyRain();
-                    
-                    // Show the closest daily frame
                     showFrame(state.dailyRainCurrentIndex);
                 } else {
-                    // Switch to normal mode
                     state.isDailyRainMode = false;
                     updateSliderForNormalMode();
-                    
                     detectTotalForecastHours().then(() => {
                         showFrame(state.currentFH);
                     });
@@ -2632,10 +2774,19 @@
             
             elements.searchInput.addEventListener('input', (e) => {
                 clearTimeout(state.searchTimeout);
-                state.searchTimeout = setTimeout(() => searchLocation(e.target.value), 500);
+                const query = e.target.value.trim();
+                if (query.length >= 2) {
+                    state.searchTimeout = setTimeout(() => searchLocation(query), 300); // Faster response
+                } else {
+                    elements.searchResults.style.display = 'none';
+                }
             });
             
-            elements.searchBtn.addEventListener('click', () => searchLocation(elements.searchInput.value));
+            elements.searchBtn.addEventListener('click', () => {
+                const query = elements.searchInput.value.trim();
+                if (query) searchLocation(query);
+            });
+            
             elements.geoBtn.addEventListener('click', getUserLocation);
             
             document.addEventListener('click', (e) => { 
@@ -2683,6 +2834,7 @@
                 if (result.gridIndex && result.value !== null) {
                     const variable = elements.varSelect.value;
                     updateStatus('Opening timeseries chart...', 'info');
+                    // Instant timeseries - no loading screen
                     await showTimeseriesChart(lat, lng, variable, result.gridIndex.i, result.gridIndex.j);
                 }
             });
@@ -2738,16 +2890,16 @@
                 debug(`Hours since start: ${hoursSinceStart}`);
                 debug(`Loading spatial plot for current forecast hour: ${currentFH}`);
         
-                // Set slider to normal mode initially
                 updateSliderForNormalMode();
-                
                 await showFrame(currentFH);
         
                 updateStatus('Click on map to view timeseries', 'success');
                 setTimeout(() => autoDetectLocation(), 1000);
-                setTimeout(() => preloadAllTimeseriesData(), 500);
-                updateCurrentDateTime();
                 
+                // Start parallel preloading of all JSON files
+                setTimeout(() => preloadAllJSONFiles(), 500);
+                
+                updateCurrentDateTime();
                 startRealTimeMonitoring();
                 
             } catch (error) {
