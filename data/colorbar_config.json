@@ -10,7 +10,7 @@
   },
   "RH": {
     "name": "RH",
-    "colorbar_min": 10.0,
+    "colorbar_min": 8.0,
     "colorbar_max": 97.0,
     "unit": "%",
     "cmap": "viridis",
@@ -20,7 +20,7 @@
   "RAIN": {
     "name": "RAIN",
     "colorbar_min": 0.0,
-    "colorbar_max": 5.0,
+    "colorbar_max": 4.0,
     "unit": "mm",
     "cmap": "Blues",
     "display_name": "Rain",
@@ -29,7 +29,7 @@
   "WIND": {
     "name": "WIND",
     "colorbar_min": 0.0,
-    "colorbar_max": 11.0,
+    "colorbar_max": 10.0,
     "unit": "m/s",
     "cmap": "hot_r",
     "display_name": "Wind",

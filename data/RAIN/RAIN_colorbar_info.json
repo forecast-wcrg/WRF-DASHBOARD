@@ -1,15 +1,15 @@
 {
   "variable": "RAIN",
   "colorbar_min": 0.0,
-  "colorbar_max": 5.0,
+  "colorbar_max": 4.0,
   "unit": "mm",
   "percentiles_used": "2-99.8%",
-  "actual_data_min": -5.681067705154419e-08,
-  "actual_data_max": 23.09284019470215,
+  "actual_data_min": -7.580906924431474e-08,
+  "actual_data_max": 20.84988021850586,
   "ticks": [
     0,
-    2,
+    1,
     3,
-    5
+    4
   ]
 }
