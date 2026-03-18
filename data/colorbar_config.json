@@ -2,7 +2,7 @@
   "T2": {
     "name": "T2",
     "colorbar_min": -17.0,
-    "colorbar_max": 37.0,
+    "colorbar_max": 38.0,
     "unit": "\u00b0C",
     "cmap": "coolwarm",
     "display_name": "T2",
@@ -11,7 +11,7 @@
   "RH": {
     "name": "RH",
     "colorbar_min": 8.0,
-    "colorbar_max": 97.0,
+    "colorbar_max": 96.0,
     "unit": "%",
     "cmap": "viridis",
     "display_name": "Rh",
@@ -20,7 +20,7 @@
   "RAIN": {
     "name": "RAIN",
     "colorbar_min": 0.0,
-    "colorbar_max": 4.0,
+    "colorbar_max": 5.0,
     "unit": "mm",
     "cmap": "Blues",
     "display_name": "Rain",

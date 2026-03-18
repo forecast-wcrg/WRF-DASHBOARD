@@ -4,8 +4,8 @@
   "colorbar_max": 10.0,
   "unit": "m/s",
   "percentiles_used": "2-98%",
-  "actual_data_min": 0.000365204643458128,
-  "actual_data_max": 27.748884201049805,
+  "actual_data_min": 0.0006168316467665136,
+  "actual_data_max": 26.574460983276367,
   "ticks": [
     0,
     2,
