@@ -1243,6 +1243,11 @@
             return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: true }).toUpperCase();
         }
 
+        // ===== NEW HELPER: format a date as "12 Mar" style in IST =====
+        function formatDailyRainLabel(date) {
+            return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
+        }
+
         function updateCurrentDateTime() {
             const now = new Date();
             elements.currentDateTime.textContent = now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
@@ -1754,7 +1759,11 @@
                     const ck = `${variable}_${fh}`;
                     let gd = state.allGrids[ck];
                     if (!gd) { try { const r = await fetch(`data_json/${variable}/${variable}_${fh.toString().padStart(3,'0')}.json`); if (r.ok) { gd = await r.json(); state.allGrids[ck] = gd; } } catch(e) { continue; } }
-                    if (gd?.values && gridIndex.i < gd.values.length && gridIndex.j < gd.values[0].length) { const v = gd.values[gridIndex.i][gridIndex.j]; if (v !== null && !isNaN(v)) forecastData.push({ hour: i, fh, time: new Date(CONFIG.forecastStart.getTime() + fh * 3600000), value: v, formattedTime: `D${i+1}` }); }
+                    if (gd?.values && gridIndex.i < gd.values.length && gridIndex.j < gd.values[0].length) {
+                        const v = gd.values[gridIndex.i][gridIndex.j];
+                        const ts = new Date(CONFIG.forecastStart.getTime() + fh * 3600000);
+                        if (v !== null && !isNaN(v)) forecastData.push({ hour: i, fh, time: ts, value: v, formattedTime: formatDailyRainLabel(ts) });
+                    }
                 }
             } else {
                 for (let hour = 0; hour < 24; hour++) {
@@ -1848,7 +1857,8 @@
 
             let formattedTimes;
             if (data.variable === 'DAILY_RAIN') {
-                formattedTimes = data.hours.map((fh,i) => `Day ${i+1}`);
+                // Show actual date (e.g. "12 Mar") derived from forecastStart + fh hours
+                formattedTimes = data.timestamps.map(ts => formatDailyRainLabel(ts));
             } else {
                 formattedTimes = data.timestamps.map((ts,i) => {
                     if (data.timestamps.length > 50 && i % Math.ceil(data.timestamps.length/15) !== 0) return '';
@@ -1889,7 +1899,12 @@
                             bodyFont: { size: 14, family: "'DM Sans', sans-serif" },
                             callbacks: {
                                 title: (items) => {
-                                    if (data.variable === 'DAILY_RAIN') return `Day ${items[0].dataIndex+1} (FH+${data.hours[items[0].dataIndex]}h)`;
+                                    if (data.variable === 'DAILY_RAIN') {
+                                        // Show full date in tooltip: "12 Mar 2026 (+23h)"
+                                        const ts = data.timestamps[items[0].dataIndex];
+                                        const dateStr = ts.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' });
+                                        return `${dateStr} (FH +${data.hours[items[0].dataIndex]}h)`;
+                                    }
                                     return data.timestamps[items[0].dataIndex].toLocaleString('en-IN',{timeZone:'Asia/Kolkata',weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase() + ' IST';
                                 },
                                 label: (ctx) => `${varConfig.name}: ${ctx.parsed.y.toFixed(varConfig.precision)} ${varConfig.unit}`,
@@ -1905,7 +1920,7 @@
                         x: {
                             grid: { color: gridColor },
                             ticks: { color: textColor, maxRotation: 35, font: { size: 12, family: "'DM Sans', sans-serif", weight: '600' }, maxTicksLimit: 15 },
-                            title: { display: true, text: data.variable === 'DAILY_RAIN' ? 'Forecast Day' : 'Date Time (IST)', color: textColor, font: { size: 14, weight: '800', family: "'DM Sans', sans-serif" } }
+                            title: { display: true, text: data.variable === 'DAILY_RAIN' ? 'Forecast Date (IST)' : 'Date Time (IST)', color: textColor, font: { size: 14, weight: '800', family: "'DM Sans', sans-serif" } }
                         },
                         y: {
                             grid: { color: gridColor },
