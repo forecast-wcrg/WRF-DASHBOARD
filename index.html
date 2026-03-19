@@ -1138,7 +1138,7 @@
     <script>
         // ==================== CONFIGURATION ====================
         const CONFIG = {
-            forecastStart: new Date("2026-03-18T05:30:00+05:30"),
+            forecastStart: new Date("2026-03-11T05:30:00+05:30"),
             baseFrameTime: 1000,
             debugMode: true,
             wrfBounds: [[28.2639, 76.6887], [31.6276, 81.1533]],
@@ -1243,9 +1243,16 @@
             return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: true }).toUpperCase();
         }
 
-        // ===== NEW HELPER: format a date as "12 Mar" style in IST =====
-        function formatDailyRainLabel(date) {
-            return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
+        // ===== NEW HELPER: format day index (0-based) as "11 Mar", "12 Mar"... from forecast start date =====
+        function formatDailyRainLabel(dayIndex) {
+            // Use calendar date of forecastStart in IST, then add dayIndex days
+            const istOffset = 5.5 * 60 * 60 * 1000; // IST = UTC+5:30
+            const startMidnight = new Date(CONFIG.forecastStart);
+            // Get the IST calendar date of forecast start
+            const startIST = new Date(CONFIG.forecastStart.getTime() + istOffset);
+            const startDateOnly = new Date(Date.UTC(startIST.getUTCFullYear(), startIST.getUTCMonth(), startIST.getUTCDate()));
+            const targetDate = new Date(startDateOnly.getTime() + dayIndex * 24 * 60 * 60 * 1000);
+            return targetDate.toLocaleString('en-IN', { timeZone: 'UTC', day: 'numeric', month: 'short' });
         }
 
         function updateCurrentDateTime() {
@@ -1762,7 +1769,7 @@
                     if (gd?.values && gridIndex.i < gd.values.length && gridIndex.j < gd.values[0].length) {
                         const v = gd.values[gridIndex.i][gridIndex.j];
                         const ts = new Date(CONFIG.forecastStart.getTime() + fh * 3600000);
-                        if (v !== null && !isNaN(v)) forecastData.push({ hour: i, fh, time: ts, value: v, formattedTime: formatDailyRainLabel(ts) });
+                        if (v !== null && !isNaN(v)) forecastData.push({ hour: i, fh, time: ts, value: v, formattedTime: formatDailyRainLabel(i) });
                     }
                 }
             } else {
@@ -1857,8 +1864,8 @@
 
             let formattedTimes;
             if (data.variable === 'DAILY_RAIN') {
-                // Show actual date (e.g. "12 Mar") derived from forecastStart + fh hours
-                formattedTimes = data.timestamps.map(ts => formatDailyRainLabel(ts));
+                // Show actual date (e.g. "11 Mar", "12 Mar"...) starting from forecast start date
+                formattedTimes = data.hours.map((fh, i) => formatDailyRainLabel(i));
             } else {
                 formattedTimes = data.timestamps.map((ts,i) => {
                     if (data.timestamps.length > 50 && i % Math.ceil(data.timestamps.length/15) !== 0) return '';
@@ -1900,10 +1907,14 @@
                             callbacks: {
                                 title: (items) => {
                                     if (data.variable === 'DAILY_RAIN') {
-                                        // Show full date in tooltip: "12 Mar 2026 (+23h)"
-                                        const ts = data.timestamps[items[0].dataIndex];
-                                        const dateStr = ts.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' });
-                                        return `${dateStr} (FH +${data.hours[items[0].dataIndex]}h)`;
+                                        // Show full date in tooltip: "11 Mar 2026 (+23h)"
+                                        const idx = items[0].dataIndex;
+                                        const istOffset = 5.5 * 60 * 60 * 1000;
+                                        const startIST = new Date(CONFIG.forecastStart.getTime() + istOffset);
+                                        const startDateOnly = new Date(Date.UTC(startIST.getUTCFullYear(), startIST.getUTCMonth(), startIST.getUTCDate()));
+                                        const targetDate = new Date(startDateOnly.getTime() + idx * 24 * 60 * 60 * 1000);
+                                        const dateStr = targetDate.toLocaleString('en-IN', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
+                                        return `${dateStr} (FH +${data.hours[idx]}h)`;
                                     }
                                     return data.timestamps[items[0].dataIndex].toLocaleString('en-IN',{timeZone:'Asia/Kolkata',weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase() + ' IST';
                                 },
