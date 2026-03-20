@@ -20,7 +20,7 @@
   "RAIN": {
     "name": "RAIN",
     "colorbar_min": 0.0,
-    "colorbar_max": 7.0,
+    "colorbar_max": 2.0,
     "unit": "mm",
     "cmap": "Blues",
     "display_name": "Rain",
