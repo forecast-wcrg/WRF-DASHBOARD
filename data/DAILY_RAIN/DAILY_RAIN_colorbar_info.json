@@ -1,11 +1,11 @@
 {
   "variable": "DAILY_RAIN",
   "colorbar_min": 0.0,
-  "colorbar_max": 106.0,
+  "colorbar_max": 104.0,
   "unit": "mm",
   "percentiles_used": "2-99.85%",
-  "actual_data_min": -5.202621977673516e-08,
-  "actual_data_max": 186.99044799804688,
+  "actual_data_min": -1.72171255030662e-08,
+  "actual_data_max": 182.8603057861328,
   "ticks": [
     0,
     25,

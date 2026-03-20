@@ -46,7 +46,6 @@
             --text-primary: #ffffff;
             --text-secondary: #e0f0ff;
             --text-dim: #aac0dd;
-            /* Removed heavy shadow-glow – keep it subtle */
             --shadow-glow: 0 0 20px rgba(0, 255, 255, 0.12);
             --shadow-card: 0 8px 30px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,255,255,0.15) inset;
 
@@ -100,7 +99,6 @@
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-            /* Subtle ambient background – no heavy scattering */
             background-image: radial-gradient(circle at 20% 30%, rgba(0,255,255,0.05) 0%, transparent 30%),
                               radial-gradient(circle at 80% 70%, rgba(255,100,255,0.04) 0%, transparent 35%);
         }
@@ -543,7 +541,6 @@
             position: fixed; bottom: clamp(60px, 5.5vw, 85px); left: 50%; transform: translateX(-50%);
             z-index: 800; display: flex; align-items: center; gap: clamp(6px, 0.8vw, 15px);
             white-space: nowrap;
-            /* Constrain so it never reaches the side panels */
             max-width: calc(100vw - clamp(440px, 40vw, 680px));
             overflow: visible;
         }
@@ -740,17 +737,13 @@
         .left-panel .conditions-card::-webkit-scrollbar { width: 4px; }
         .left-panel .glass-card::-webkit-scrollbar-thumb,
         .left-panel .conditions-card::-webkit-scrollbar-thumb { background: var(--accent-sky); border-radius: 10px; }
-        /* right-panel cards: never scroll individually — panel as a whole scrolls */
         .right-panel .glass-card { overflow: visible; }
 
         /* ===== RESPONSIVE BREAKPOINTS ===== */
-
-        /* ---- 27-INCH / 4K (min 2000px) ---- */
         @media (min-width: 2000px) {
             body { font-size: 19px; }
         }
 
-        /* ---- HIDE CHIPS ON SMALLER SCREENS ---- */
         @media (max-width: 1280px) {
             .top-bar-center .time-chip:nth-child(4) { display: none; }
         }
@@ -758,16 +751,13 @@
             .logo-sub { display: none; }
             .top-bar-center .time-chip:nth-child(3),
             .top-bar-center .time-chip:nth-child(4) { display: none; }
-            /* hide side pills at this width — only center pill fits */
             .map-tip-left-pill, .map-tip-right-pill { display: none; }
         }
         @media (max-width: 960px) {
-            /* hide all pills — too cramped */
             .map-tips-row { display: none; }
             .watermark { display: none; }
         }
 
-        /* ---- TABLET / PHONE (max 768px) ---- */
         @media (max-width: 768px) {
             body { font-size: 14px; overflow: auto; height: auto; }
             #map { position: fixed; height: 100vh; }
@@ -842,7 +832,6 @@
             .chart-btn { padding: 9px 14px; font-size: 0.78rem; gap: 6px; }
         }
 
-        /* ---- MOBILE PORTRAIT (max 480px) ---- */
         @media (max-width: 480px) {
             .top-bar-center .time-chip:nth-child(3),
             .top-bar-center .time-chip:nth-child(4) { display: none; }
@@ -853,14 +842,12 @@
             .chart-stats { gap: 8px; }
         }
 
-        /* ---- TINY PHONES (max 360px) ---- */
         @media (max-width: 360px) {
             .left-panel > * { min-width: 200px; }
             .right-panel > * { min-width: 175px; }
             .chart-container { height: 175px; }
         }
 
-        /* Mobile panel toggle - hidden on desktop */
         .mobile-panel-toggle { display: none; }
 
     </style>
@@ -1012,7 +999,6 @@
         <div class="glass-card">
             <div class="card-title"><i class="fas fa-info-circle"></i> Legend</div>
             <div class="legend-items">
-                <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b;"></div><span>Domain</span></div>
                 <div class="legend-item"><div class="legend-dot" style="background:#00f0ff;"></div><span>Click Position</span></div>
                 <div class="legend-item">
                     <div style="width:14px;height:14px;border-radius:5px;background:linear-gradient(90deg,#00f0ff,#ff66aa);flex-shrink:0;"></div>
@@ -1096,7 +1082,6 @@
 
         <input type="range" id="timeSlider" min="0" max="359" step="1" value="0" style="display:none;">
         <i id="variableIcon" style="display:none;"></i>
-        <!-- Hidden elements required by JS -->
         <span id="currentFH2" style="display:none;">0</span>
         <span id="totalFH2" style="display:none;">359</span>
     </div>
@@ -1138,7 +1123,7 @@
     <script>
         // ==================== CONFIGURATION ====================
         const CONFIG = {
-            forecastStart: new Date("2026-03-18T05:30:00+05:30"),
+            forecastStart: new Date("2026-03-19T05:30:00+05:30"),
             baseFrameTime: 1000,
             debugMode: true,
             wrfBounds: [[28.2639, 76.6887], [31.6276, 81.1533]],
@@ -1168,7 +1153,8 @@
             realTimeUpdateTimer: null, lastRealTimeCheck: 0,
             dailyRainCurrentIndex: 0, isDailyRainMode: false,
             preloadProgress: 0, preloadTotal: 0, preloadCompleted: 0, preloadStarted: false,
-            searchCache: new Map(), lastSearchQuery: '', searchAbortController: null
+            searchCache: new Map(), lastSearchQuery: '', searchAbortController: null,
+            conditionsTimeTimer: null  // FIX: timer for conditions time auto-update
         };
 
         const elements = {
@@ -1243,12 +1229,8 @@
             return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: true }).toUpperCase();
         }
 
-        // ===== NEW HELPER: format day index (0-based) as "11 Mar", "12 Mar"... from forecast start date =====
         function formatDailyRainLabel(dayIndex) {
-            // Use calendar date of forecastStart in IST, then add dayIndex days
-            const istOffset = 5.5 * 60 * 60 * 1000; // IST = UTC+5:30
-            const startMidnight = new Date(CONFIG.forecastStart);
-            // Get the IST calendar date of forecast start
+            const istOffset = 5.5 * 60 * 60 * 1000;
             const startIST = new Date(CONFIG.forecastStart.getTime() + istOffset);
             const startDateOnly = new Date(Date.UTC(startIST.getUTCFullYear(), startIST.getUTCMonth(), startIST.getUTCDate()));
             const targetDate = new Date(startDateOnly.getTime() + dayIndex * 24 * 60 * 60 * 1000);
@@ -1259,6 +1241,24 @@
             const now = new Date();
             elements.currentDateTime.textContent = now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
             setTimeout(updateCurrentDateTime, 60000);
+        }
+
+        // FIX: Dedicated function to update conditionsTime every minute
+        function startConditionsTimeClock() {
+            // Clear any existing timer
+            if (state.conditionsTimeTimer) clearInterval(state.conditionsTimeTimer);
+
+            function tick() {
+                if (elements.currentConditions.style.display !== 'none') {
+                    const now = new Date();
+                    elements.conditionsTime.textContent = now.toLocaleTimeString('en-IN', {
+                        timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit'
+                    }) + ' IST';
+                }
+            }
+
+            tick(); // run immediately
+            state.conditionsTimeTimer = setInterval(tick, 60000); // then every 60 seconds
         }
 
         function getDailyRainIndexFromFH(fh) {
@@ -1325,10 +1325,7 @@
             });
             L.control.zoom({ position: 'bottomright' }).addTo(state.map);
             state.map.setView([29.5, 79.5], 7);
-            state.markers.boundaryLayer = L.rectangle(CONFIG.wrfBounds, {
-                color: '#ff6b6b', weight: 2, fillColor: '#ff6b6b',
-                fillOpacity: 0.08, interactive: true, dashArray: '5, 5'
-            }).addTo(state.map);
+            // FIX: Removed red dotted boundary rectangle — no boundaryLayer added
         }
 
         function isInWRFDomain(lat, lon) {
@@ -1696,6 +1693,7 @@
             elements.locationBadge.style.display = 'flex'; elements.badgeLocation.textContent = name;
             updateCurrentConditions(lat, lon);
             loadHourlyForecast(lat, lon);
+            startConditionsTimeClock(); // FIX: start/restart the clock when location is set
         }
 
         async function getUserLocation() {
@@ -1725,7 +1723,10 @@
             const now = new Date();
             const hoursSinceStart = Math.floor((now - CONFIG.forecastStart) / 3600000);
             const currentFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
-            elements.conditionsTime.textContent = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
+            // FIX: update time immediately on each call; the clock interval handles minute-by-minute updates
+            elements.conditionsTime.textContent = now.toLocaleTimeString('en-IN', {
+                timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) + ' IST';
             const gridIndex = latLonToGridIndex(lat, lon);
             if (!gridIndex) return;
             const vars = ['T2', 'RH', 'WIND', 'RAIN'];
@@ -1864,7 +1865,6 @@
 
             let formattedTimes;
             if (data.variable === 'DAILY_RAIN') {
-                // Show actual date (e.g. "11 Mar", "12 Mar"...) starting from forecast start date
                 formattedTimes = data.hours.map((fh, i) => formatDailyRainLabel(i));
             } else {
                 formattedTimes = data.timestamps.map((ts,i) => {
@@ -1907,7 +1907,6 @@
                             callbacks: {
                                 title: (items) => {
                                     if (data.variable === 'DAILY_RAIN') {
-                                        // Show full date in tooltip: "11 Mar 2026 (+23h)"
                                         const idx = items[0].dataIndex;
                                         const istOffset = 5.5 * 60 * 60 * 1000;
                                         const startIST = new Date(CONFIG.forecastStart.getTime() + istOffset);
@@ -2105,7 +2104,6 @@
                     rightPanel.style.display = '';
                     return;
                 }
-                // On mobile: show left by default, hide right
                 leftPanel.style.display = leftBtn.classList.contains('active') ? 'flex' : 'none';
                 rightPanel.style.display = rightBtn.classList.contains('active') ? 'flex' : 'none';
             }
