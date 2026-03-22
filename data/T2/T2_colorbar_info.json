@@ -1,11 +1,11 @@
 {
   "variable": "T2",
   "colorbar_min": -16.0,
-  "colorbar_max": 38.0,
+  "colorbar_max": 37.0,
   "unit": "\u00b0C",
   "percentiles_used": "2-98%",
-  "actual_data_min": -29.971939086914062,
-  "actual_data_max": 41.104583740234375,
+  "actual_data_min": -29.49871826171875,
+  "actual_data_max": 40.047607421875,
   "ticks": [
     -16,
     -11,
