@@ -6,7 +6,7 @@
     <title>MausamDrishti Dashboard - Uttarakhand | HyperVisual Edition</title>
     
     <!-- Meta refresh: reload page every 6 hours (21600000 ms) to sync forecast start time -->
-    <meta http-equiv="refresh" content="60">
+    <meta http-equiv="refresh" content="21600">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1080,7 +1080,7 @@
     <script>
         // ==================== CONFIGURATION ====================
         const CONFIG = {
-            forecastStart: new Date("2026-03-24T05:30:00+05:30"),
+            forecastStart: new Date("2026-03-23T05:30:00+05:30"),
             baseFrameTime: 1000,
             debugMode: true,
             wrfBounds: [[28.2639, 76.6887], [31.6276, 81.1533]],
@@ -1628,7 +1628,7 @@
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
             elements.globalPreloader.style.display = 'none';
-            updateStatus('Frontend & Backend developed by Shiwam Singh', 'success');
+            updateStatus('The future isn’t fixed but it’s predictable', 'success');
         }
 
         function updatePreloaderProgress() {
