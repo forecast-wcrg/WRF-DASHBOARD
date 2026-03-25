@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>MausamDrishti Dashboard - Uttarakhand | HyperVisual Edition</title>
     
+    <!-- Meta refresh: reload page every 6 hours (21600000 ms) to sync forecast start time -->
+    <meta http-equiv="refresh" content="21600">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=Clash+Display:wght@500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -794,6 +797,17 @@
             .chart-container { height: 175px; }
         }
         .mobile-panel-toggle { display: none; }
+        
+        /* Auto-refresh countdown indicator */
+        .refresh-indicator {
+            font-size: 0.7rem;
+            opacity: 0.7;
+            margin-left: 8px;
+            font-family: var(--font-mono);
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
     </style>
 </head>
 <body data-theme="dark">
@@ -818,6 +832,7 @@
             <div class="time-chip">Forecast Current Time: <span id="fcValid">Loading...</span></div>
             <div class="time-chip">FH&nbsp;<span id="currentFH">0</span>/<span id="totalFH">359</span></div>
             <div class="time-chip"><span id="currentDateTime">--</span>&nbsp;IST</div>
+
         </div>
 
         <div class="top-bar-right">
@@ -1080,9 +1095,40 @@
             dailyRainIndices: [23, 47, 71, 95, 119, 143, 167, 191, 215, 239, 263, 287, 311, 335, 359],
             defaultLocation: { lat: 29.8625, lon: 77.8915278, name: "IIT Roorkee" },
             batchSize: 20,
-            totalForecastHours: 359
+            totalForecastHours: 359,
+            // Auto-refresh interval: 6 hours = 21600000 ms
+            autoRefreshIntervalMs: 60000//21600000
         };
 
+        // Countdown timer for refresh indicator
+        let refreshCountdownInterval = null;
+        
+        function startRefreshCountdown() {
+            if (refreshCountdownInterval) clearInterval(refreshCountdownInterval);
+            const refreshEl = document.getElementById('refreshCountdown');
+            if (!refreshEl) return;
+            
+            const updateCountdown = () => {
+                const lastRefresh = parseInt(localStorage.getItem('lastRefreshTime') || Date.now());
+                const elapsed = Date.now() - lastRefresh;
+                const remaining = Math.max(0, CONFIG.autoRefreshIntervalMs - elapsed);
+                const hours = Math.floor(remaining / 3600000);
+                const minutes = Math.floor((remaining % 3600000) / 60000);
+                if (remaining <= 0) {
+                    refreshEl.textContent = '0h';
+                } else if (hours > 0) {
+                    refreshEl.textContent = `${hours}h ${minutes}m`;
+                } else {
+                    refreshEl.textContent = `${minutes}m`;
+                }
+            };
+            updateCountdown();
+            refreshCountdownInterval = setInterval(updateCountdown, 60000);
+        }
+        
+        // Store last refresh time on page load
+        localStorage.setItem('lastRefreshTime', Date.now());
+        
         const state = {
             currentLayer: null, currentGrid: null, currentFH: 0, allGrids: {},
             allTimeseriesData: {}, totalForecastHours: 359, isPlaying: false, timer: null,
@@ -1154,6 +1200,9 @@
         };
 
         document.getElementById('currentYear').textContent = new Date().getFullYear();
+        
+        // Start countdown timer for refresh indicator
+        startRefreshCountdown();
 
         function debug(message, data = null) { if (CONFIG.debugMode) console.log(`🔍 ${message}`, data || ''); }
 
@@ -1579,7 +1628,7 @@
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
             elements.globalPreloader.style.display = 'none';
-            updateStatus('The future isn’t fixed but it’s predictable', 'success');
+            updateStatus('Frontend & Backend developed by Shiwam Singh', 'success');
         }
 
         function updatePreloaderProgress() {
