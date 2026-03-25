@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>MausamDrishti Dashboard - Uttarakhand | HyperVisual Edition</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -63,10 +63,10 @@
         }
 
         [data-theme="light"] {
-            --glass-bg: rgba(255, 255, 255, 0.95);
-            --glass-bg-light: rgba(240, 248, 255, 0.9);
-            --glass-border: rgba(0, 100, 255, 0.3);
-            --glass-border-bright: rgba(150, 0, 255, 0.4);
+            --glass-bg: rgba(255, 255, 255, 0.96);
+            --glass-bg-light: rgba(245, 250, 255, 0.92);
+            --glass-border: rgba(0, 100, 200, 0.35);
+            --glass-border-bright: rgba(100, 50, 200, 0.45);
 
             --accent-sky: #0066ff;
             --accent-cyan: #0088cc;
@@ -86,7 +86,7 @@
             --text-secondary: #112244;
             --text-dim: #335577;
             --shadow-glow: 0 0 15px rgba(0, 100, 255, 0.15);
-            --shadow-card: 0 6px 25px rgba(0,0,0,0.12);
+            --shadow-card: 0 6px 25px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,100,200,0.2) inset;
         }
 
         body {
@@ -236,13 +236,19 @@
         .right-panel::-webkit-scrollbar { width: 6px; }
         .right-panel::-webkit-scrollbar-thumb { background: var(--accent-magenta); border-radius: 10px; }
 
-        /* ===== GLASS CARD ===== */
-        .glass-card {
-            background: var(--glass-bg); backdrop-filter: blur(22px) saturate(180%);
-            border: 1px solid var(--glass-border); border-radius: var(--panel-radius);
-            padding: clamp(10px, 1vw, 18px) clamp(9px, 0.9vw, 16px); box-shadow: var(--shadow-card); transition: border-color 0.3s;
+        /* ===== GLASS CARD - UNIFIED BACKGROUND ===== */
+        .glass-card, .conditions-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(22px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--panel-radius);
+            padding: clamp(10px, 1vw, 18px) clamp(9px, 0.9vw, 16px);
+            box-shadow: var(--shadow-card);
+            transition: border-color 0.3s;
         }
-        .glass-card:hover { border-color: var(--glass-border-bright); }
+        .glass-card:hover, .conditions-card:hover {
+            border-color: var(--glass-border-bright);
+        }
 
         .card-title {
             font-family: var(--font-display); font-size: clamp(0.7rem, 0.65vw, 0.95rem); font-weight: 800;
@@ -300,13 +306,7 @@
         .domain-badge.inside { background: rgba(0,255,170,0.2); color: var(--accent-lime); border: 1px solid var(--accent-lime); }
         .domain-badge.outside { background: rgba(255,100,100,0.15); color: var(--accent-rose); border: 1px solid var(--accent-rose); }
 
-        /* ===== CONDITIONS CARD – compact ===== */
-        .conditions-card {
-            background: linear-gradient(135deg, rgba(0,255,255,0.12), rgba(200,100,255,0.08), rgba(255,100,200,0.06));
-            border: 1px solid var(--accent-sky); border-radius: var(--panel-radius);
-            padding: 14px; box-shadow: var(--shadow-card); position: relative; overflow: hidden;
-        }
-
+        /* ===== CONDITIONS CARD ===== */
         .cond-loc {
             font-family: var(--font-display); font-weight: 800; font-size: 1.05rem;
             color: var(--text-primary); display: flex; align-items: center; gap: 8px;
@@ -317,8 +317,6 @@
             font-size: 0.78rem; color: var(--text-dim); font-family: var(--font-mono);
             margin-bottom: 10px; font-weight: 600;
         }
-
-        /* Compact 4-col grid for conditions */
         .cond-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr 1fr;
@@ -704,15 +702,16 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, var(--accent-sky), var(--accent-magenta)); border-radius: 10px; }
 
-        /* Light theme */
+        /* Light theme unified background consistency */
         [data-theme="light"] .glass-card,
+        [data-theme="light"] .conditions-card,
         [data-theme="light"] .top-bar,
         [data-theme="light"] .bottom-bar,
         [data-theme="light"] .map-pill,
         [data-theme="light"] .location-badge,
         [data-theme="light"] .chart-modal-content {
-            background: rgba(255,255,255,0.95) !important;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.12) !important;
+            background: var(--glass-bg) !important;
+            box-shadow: var(--shadow-card) !important;
         }
         [data-theme="light"] #lat { color: #0066ff; }
         [data-theme="light"] #lon { color: #8800cc; }
@@ -727,7 +726,7 @@
             -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
         }
 
-        /* ===== INDIVIDUAL CARD SCROLL — all screens ===== */
+        /* ===== INDIVIDUAL CARD SCROLL ===== */
         .left-panel .glass-card,
         .left-panel .conditions-card {
             overflow-y: auto; overflow-x: hidden;
@@ -740,13 +739,8 @@
         .right-panel .glass-card { overflow: visible; }
 
         /* ===== RESPONSIVE BREAKPOINTS ===== */
-        @media (min-width: 2000px) {
-            body { font-size: 19px; }
-        }
-
-        @media (max-width: 1280px) {
-            .top-bar-center .time-chip:nth-child(4) { display: none; }
-        }
+        @media (min-width: 2000px) { body { font-size: 19px; } }
+        @media (max-width: 1280px) { .top-bar-center .time-chip:nth-child(4) { display: none; } }
         @media (max-width: 1100px) {
             .logo-sub { display: none; }
             .top-bar-center .time-chip:nth-child(3),
@@ -757,81 +751,34 @@
             .map-tips-row { display: none; }
             .watermark { display: none; }
         }
-
         @media (max-width: 768px) {
             body { font-size: 14px; overflow: auto; height: auto; }
             #map { position: fixed; height: 100vh; }
-
-            .top-bar {
-                height: auto; min-height: 52px; padding: 7px 12px;
-                flex-wrap: wrap; gap: 5px;
-            }
-            .top-bar-center {
-                order: 3; width: 100%; justify-content: flex-start;
-                padding: 0; gap: 5px; flex-wrap: nowrap;
-                overflow-x: auto; scrollbar-width: none; padding-bottom: 3px;
-            }
+            .top-bar { height: auto; min-height: 52px; padding: 7px 12px; flex-wrap: wrap; gap: 5px; }
+            .top-bar-center { order: 3; width: 100%; justify-content: flex-start; padding: 0; gap: 5px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 3px; }
             .top-bar-center::-webkit-scrollbar { display: none; }
             .top-bar-center .time-chip:nth-child(3),
             .top-bar-center .time-chip:nth-child(4) { display: flex; }
             .logo-sub { display: none; }
-
-            .left-panel {
-                position: fixed; top: auto; bottom: 60px; left: 0; right: 0;
-                width: 100%; max-height: 55vh;
-                flex-direction: row; gap: 10px;
-                overflow-x: auto; overflow-y: hidden;
-                padding: 8px 10px 5px; scrollbar-width: none;
-                z-index: 800; flex-wrap: nowrap; align-items: flex-start;
-            }
+            .left-panel { position: fixed; top: auto; bottom: 60px; left: 0; right: 0; width: 100%; max-height: 55vh; flex-direction: row; gap: 10px; overflow-x: auto; overflow-y: hidden; padding: 8px 10px 5px; scrollbar-width: none; z-index: 800; flex-wrap: nowrap; align-items: flex-start; }
             .left-panel::-webkit-scrollbar { display: none; }
             .left-panel > * { min-width: 250px; flex-shrink: 0; max-height: 50vh; overflow-y: auto; }
-
-            .right-panel {
-                position: fixed; top: auto; bottom: 60px; right: 0;
-                width: 100%; max-height: 55vh;
-                flex-direction: row; gap: 10px;
-                overflow-x: auto; overflow-y: hidden;
-                padding: 8px 10px 5px; scrollbar-width: none;
-                z-index: 799; flex-wrap: nowrap; align-items: flex-start;
-                display: none;
-            }
+            .right-panel { position: fixed; top: auto; bottom: 60px; right: 0; width: 100%; max-height: 55vh; flex-direction: row; gap: 10px; overflow-x: auto; overflow-y: hidden; padding: 8px 10px 5px; scrollbar-width: none; z-index: 799; flex-wrap: nowrap; align-items: flex-start; display: none; }
             .right-panel::-webkit-scrollbar { display: none; }
             .right-panel > * { min-width: 215px; flex-shrink: 0; max-height: 50vh; overflow-y: auto; }
-
             .map-tips-row { display: none; }
             .watermark { display: none; }
             .location-badge { font-size: 0.78rem; padding: 7px 14px; top: auto; bottom: 68px; left: 50%; }
-
-            .mobile-panel-toggle {
-                display: flex !important; position: fixed;
-                bottom: 66px; right: 10px; z-index: 900;
-                flex-direction: column; gap: 6px;
-            }
-            .mobile-toggle-btn {
-                width: 36px; height: 36px;
-                background: var(--glass-bg); border: 1px solid var(--glass-border-bright);
-                border-radius: 50%; cursor: pointer; display: flex; align-items: center;
-                justify-content: center; color: var(--accent-sky); font-size: 0.95rem;
-                backdrop-filter: blur(12px); box-shadow: 0 2px 10px rgba(0,0,0,0.4);
-                transition: all 0.2s;
-            }
-            .mobile-toggle-btn:hover, .mobile-toggle-btn.active {
-                background: var(--accent-sky); color: #000; border-color: var(--accent-sky);
-            }
-
-            .chart-modal-content {
-                margin: 0; width: 100%; max-width: 100%;
-                border-radius: 20px 20px 0 0; padding: 18px 14px;
-                position: fixed; bottom: 0; max-height: 92vh;
-            }
+            .mobile-panel-toggle { display: flex !important; position: fixed; bottom: 66px; right: 10px; z-index: 900; flex-direction: column; gap: 6px; }
+            .mobile-toggle-btn { width: 36px; height: 36px; background: var(--glass-bg); border: 1px solid var(--glass-border-bright); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--accent-sky); font-size: 0.95rem; backdrop-filter: blur(12px); box-shadow: 0 2px 10px rgba(0,0,0,0.4); transition: all 0.2s; }
+            .mobile-toggle-btn:hover, .mobile-toggle-btn.active { background: var(--accent-sky); color: #000; border-color: var(--accent-sky); }
+            .chart-modal-content { margin: 0; width: 100%; max-width: 100%; border-radius: 20px 20px 0 0; padding: 18px 14px; position: fixed; bottom: 0; max-height: 92vh; }
             .chart-container { height: 260px; }
             .chart-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
             .stat-value { font-size: 1.1rem; }
             .chart-modal-title { font-size: 1.1rem; }
             .chart-btn { padding: 9px 14px; font-size: 0.78rem; gap: 6px; }
         }
-
         @media (max-width: 480px) {
             .top-bar-center .time-chip:nth-child(3),
             .top-bar-center .time-chip:nth-child(4) { display: none; }
@@ -841,20 +788,16 @@
             .chart-container { height: 210px; }
             .chart-stats { gap: 8px; }
         }
-
         @media (max-width: 360px) {
             .left-panel > * { min-width: 200px; }
             .right-panel > * { min-width: 175px; }
             .chart-container { height: 175px; }
         }
-
         .mobile-panel-toggle { display: none; }
-
     </style>
 </head>
 <body data-theme="dark">
     <div id="map"></div>
-
 
     <div id="globalPreloader" class="global-preloader">
         <div id="preloaderFill" class="preloader-fill"></div>
@@ -1050,7 +993,6 @@
         </div>
     </div>
 
-
     <!-- MOBILE PANEL TOGGLE BUTTONS -->
     <div class="mobile-panel-toggle" id="mobilePanelToggle">
         <button class="mobile-toggle-btn active" id="mobileLeftBtn" title="Left Panel">
@@ -1154,7 +1096,7 @@
             dailyRainCurrentIndex: 0, isDailyRainMode: false,
             preloadProgress: 0, preloadTotal: 0, preloadCompleted: 0, preloadStarted: false,
             searchCache: new Map(), lastSearchQuery: '', searchAbortController: null,
-            conditionsTimeTimer: null  // FIX: timer for conditions time auto-update
+            conditionsTimeTimer: null
         };
 
         const elements = {
@@ -1243,11 +1185,8 @@
             setTimeout(updateCurrentDateTime, 60000);
         }
 
-        // FIX: Dedicated function to update conditionsTime every minute
         function startConditionsTimeClock() {
-            // Clear any existing timer
             if (state.conditionsTimeTimer) clearInterval(state.conditionsTimeTimer);
-
             function tick() {
                 if (elements.currentConditions.style.display !== 'none') {
                     const now = new Date();
@@ -1256,9 +1195,8 @@
                     }) + ' IST';
                 }
             }
-
-            tick(); // run immediately
-            state.conditionsTimeTimer = setInterval(tick, 60000); // then every 60 seconds
+            tick();
+            state.conditionsTimeTimer = setInterval(tick, 60000);
         }
 
         function getDailyRainIndexFromFH(fh) {
@@ -1325,7 +1263,6 @@
             });
             L.control.zoom({ position: 'bottomright' }).addTo(state.map);
             state.map.setView([29.5, 79.5], 7);
-            // FIX: Removed red dotted boundary rectangle — no boundaryLayer added
         }
 
         function isInWRFDomain(lat, lon) {
@@ -1693,7 +1630,7 @@
             elements.locationBadge.style.display = 'flex'; elements.badgeLocation.textContent = name;
             updateCurrentConditions(lat, lon);
             loadHourlyForecast(lat, lon);
-            startConditionsTimeClock(); // FIX: start/restart the clock when location is set
+            startConditionsTimeClock();
         }
 
         async function getUserLocation() {
@@ -1723,7 +1660,6 @@
             const now = new Date();
             const hoursSinceStart = Math.floor((now - CONFIG.forecastStart) / 3600000);
             const currentFH = Math.max(0, Math.min(hoursSinceStart, state.totalForecastHours));
-            // FIX: update time immediately on each call; the clock interval handles minute-by-minute updates
             elements.conditionsTime.textContent = now.toLocaleTimeString('en-IN', {
                 timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit'
             }) + ' IST';
@@ -2088,7 +2024,6 @@
 
         document.addEventListener('DOMContentLoaded', initializeDashboard);
 
-        // ===== MOBILE PANEL TOGGLE =====
         (function() {
             const leftPanel = document.querySelector('.left-panel');
             const rightPanel = document.querySelector('.right-panel');
