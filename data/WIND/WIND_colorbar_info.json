@@ -1,16 +1,17 @@
 {
   "variable": "WIND",
   "colorbar_min": 0.0,
-  "colorbar_max": 9.0,
+  "colorbar_max": 10.0,
   "unit": "m/s",
   "percentiles_used": "2-98%",
-  "actual_data_min": 0.0008916299557313323,
-  "actual_data_max": 29.004880905151367,
+  "actual_data_min": 0.00032809600816108286,
+  "actual_data_max": 27.458248138427734,
   "ticks": [
     0,
     2,
     4,
     6,
-    8
+    8,
+    10
   ]
 }

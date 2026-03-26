@@ -1,8 +1,8 @@
 {
   "T2": {
     "name": "T2",
-    "colorbar_min": -16.0,
-    "colorbar_max": 38.0,
+    "colorbar_min": -15.0,
+    "colorbar_max": 36.0,
     "unit": "\u00b0C",
     "cmap": "coolwarm",
     "display_name": "T2",
@@ -10,8 +10,8 @@
   },
   "RH": {
     "name": "RH",
-    "colorbar_min": 9.0,
-    "colorbar_max": 91.0,
+    "colorbar_min": 15.0,
+    "colorbar_max": 100.0,
     "unit": "%",
     "cmap": "viridis",
     "display_name": "Rh",
@@ -20,7 +20,7 @@
   "RAIN": {
     "name": "RAIN",
     "colorbar_min": 0.0,
-    "colorbar_max": 1.0,
+    "colorbar_max": 3.0,
     "unit": "mm",
     "cmap": "Blues",
     "display_name": "Rain",
@@ -29,7 +29,7 @@
   "WIND": {
     "name": "WIND",
     "colorbar_min": 0.0,
-    "colorbar_max": 9.0,
+    "colorbar_max": 10.0,
     "unit": "m/s",
     "cmap": "hot_r",
     "display_name": "Wind",
