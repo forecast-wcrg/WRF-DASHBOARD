@@ -10,8 +10,8 @@
   },
   "RH": {
     "name": "RH",
-    "colorbar_min": 9.0,
-    "colorbar_max": 97.0,
+    "colorbar_min": 7.0,
+    "colorbar_max": 100.0,
     "unit": "%",
     "cmap": "viridis",
     "display_name": "Rh",

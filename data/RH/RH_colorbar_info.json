@@ -1,20 +1,21 @@
 {
   "variable": "RH",
-  "colorbar_min": 9.0,
-  "colorbar_max": 97.0,
+  "colorbar_min": 7.0,
+  "colorbar_max": 100.0,
   "unit": "%",
   "percentiles_used": "2-98%",
   "actual_data_min": 0.0,
   "actual_data_max": 100.0,
   "ticks": [
-    9,
-    19,
-    29,
-    39,
-    49,
-    59,
-    69,
-    79,
-    89
+    7,
+    17,
+    27,
+    37,
+    47,
+    57,
+    67,
+    77,
+    87,
+    97
   ]
 }
