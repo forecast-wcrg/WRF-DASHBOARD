@@ -1,0 +1,38 @@
+{
+  "variable": "RH",
+  "colorbar_min": 28.0,
+  "colorbar_max": 100.0,
+  "unit": "%",
+  "percentiles_used": "2-98%",
+  "actual_data_min": 11.150864601135254,
+  "actual_data_max": 100.0,
+  "ticks": [
+    28,
+    38,
+    48,
+    58,
+    68,
+    78,
+    88,
+    98
+  ],
+  "use_log_scale": false,
+  "log_linear_threshold": null,
+  "tick_labels": [
+    "28%",
+    "38%",
+    "48%",
+    "58%",
+    "68%",
+    "78%",
+    "88%",
+    "98%"
+  ],
+  "clip_bounds": {
+    "lat_min": 28.2639,
+    "lon_min": 76.6887,
+    "lat_max": 31.6276,
+    "lon_max": 81.1222
+  },
+  "resolution_m": 1000
+}

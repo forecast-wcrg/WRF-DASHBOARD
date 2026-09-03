@@ -1,0 +1,17 @@
+*.grib2
+*.grib
+*.nc
+*.grb
+*.grb2
+*.bin
+*.dat
+*.log
+*.log.*
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.tmp
+*.bak
+*.swp
